@@ -1,0 +1,4 @@
+web/policy.wasm
+web/src/
+web/tools/
+.direnv/

@@ -1,3 +1,5 @@
 # LLVM ref to check out (commit SHA or tag). One ref per file.
 # Lines starting with # and blank lines are ignored.
-main
+# Pinned to the clang that emscripten (emsdk 5.0.7) uses to build the demo, so the
+# profile format written by the demo matches the llvm-cov / llvm-profdata built here.
+7b58716d96c3ae4c0c4e6f72e29b16137bb6224b

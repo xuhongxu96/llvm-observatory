@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Policy MC/DC Viewer</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fafafa;
+      --panel: #ffffff;
+      --fg: #1d1d1f;
+      --muted: #6e6e73;
+      --line: #d2d2d7;
+      --hit: rgba(9, 105, 218, 0.08);
+      --accent: #0969da;
+      --t-bg: #dafbe1; --t-fg: #116329;
+      --f-bg: #ffebe9; --f-fg: #82071e;
+      --d-bg: #eef0f3; --d-fg: #57606a;
+      --m-bg: #fff8c5; --m-fg: #7d4e00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #161617; --panel: #1f1f21; --fg: #f5f5f7; --muted: #a1a1a6; --line: #3a3a3c;
+        --hit: rgba(88, 166, 255, 0.10); --accent: #58a6ff;
+        --t-bg: #1b3a24; --t-fg: #7ee787; --f-bg: #4a1d22; --f-fg: #ffa198;
+        --d-bg: #2a2d33; --d-fg: #a1a1a6; --m-bg: #4a3b10; --m-fg: #e3b341;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #161617; --panel: #1f1f21; --fg: #f5f5f7; --muted: #a1a1a6; --line: #3a3a3c;
+      --hit: rgba(88, 166, 255, 0.10); --accent: #58a6ff;
+      --t-bg: #1b3a24; --t-fg: #7ee787; --f-bg: #4a1d22; --f-fg: #ffa198;
+      --d-bg: #2a2d33; --d-fg: #a1a1a6; --m-bg: #4a3b10; --m-fg: #e3b341;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+    header {
+      display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+      padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    header h1 { font-size: 16px; margin: 0 8px 0 0; }
+    form { display: flex; gap: 8px; flex: 1 1 360px; min-width: 0; }
+    input[type="text"] {
+      flex: 1; min-width: 0; padding: 7px 10px; font: 13px ui-monospace, Menlo, monospace;
+      color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px;
+    }
+    button {
+      padding: 7px 12px; font: inherit; color: #fff; background: var(--accent);
+      border: 0; border-radius: 6px; cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    button.chip { color: var(--accent); background: transparent; border: 1px solid var(--line); padding: 4px 8px; font-size: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    .status { padding: 6px 16px; color: var(--muted); font-size: 13px; min-height: 28px; }
+    .status.error { color: var(--f-fg); }
+    .verdict {
+      display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+      font-weight: 600; background: var(--t-bg); color: var(--t-fg);
+    }
+    .verdict.rejected { background: var(--f-bg); color: var(--f-fg); }
+
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 150px); }
+    nav { border-right: 1px solid var(--line); background: var(--panel); padding: 10px 0; }
+    nav .folder { padding: 4px 14px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    nav button.file {
+      display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 5px 14px 5px 26px; color: var(--fg); background: transparent; border-radius: 0;
+      font: 13px ui-monospace, Menlo, monospace; text-align: left;
+    }
+    nav button.file[aria-current="true"] { background: var(--hit); color: var(--accent); font-weight: 600; }
+    nav .tag { font: 11px system-ui, sans-serif; color: var(--muted); }
+
+    main { min-width: 0; padding: 12px 16px 24px; }
+    .filebar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 8px; }
+    .filebar strong { font: 14px ui-monospace, Menlo, monospace; }
+    .legend { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    .code {
+      overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace;
+    }
+    .row { display: grid; grid-template-columns: 48px 1fr; white-space: pre; min-width: max-content; }
+    .row.hit { background: var(--hit); }
+    .row .no { color: var(--muted); text-align: right; padding: 0 10px 0 8px; user-select: none; border-right: 1px solid var(--line); }
+    .row .src { padding: 0 12px; }
+    .badge {
+      display: inline-block; margin: 0 3px; padding: 0 6px; border-radius: 4px;
+      font: 600 11px/1.6 ui-monospace, Menlo, monospace; vertical-align: 1px;
+      background: var(--d-bg); color: var(--d-fg); cursor: help;
+    }
+    .badge.T { background: var(--t-bg); color: var(--t-fg); }
+    .badge.F { background: var(--f-bg); color: var(--f-fg); }
+    .badge.M { background: var(--m-bg); color: var(--m-fg); }
+    .badge.result { margin-left: 8px; }
+
+    .decisions { margin-top: 18px; }
+    .decisions h2 { font-size: 14px; margin: 0 0 8px; }
+    .decision { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .decision header { border: 0; padding: 0 0 6px; background: none; font: 13px ui-monospace, Menlo, monospace; }
+    .decision table { width: 100%; border-collapse: collapse; font: 12px ui-monospace, Menlo, monospace; }
+    .decision th, .decision td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); }
+    .decision th { color: var(--muted); font-weight: 600; }
+    .decision td.cond.T, .decision td.cond.F, .decision td.cond.dash { font-weight: 600; }
+    .decision td.cond.T { color: var(--t-fg); }
+    .decision td.cond.F { color: var(--f-fg); }
+    .decision td.cond.dash { color: var(--muted); }
+    .empty { color: var(--muted); padding: 12px 0; }
+
+    @media (max-width: 720px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Policy MC/DC Viewer</h1>
+    <form id="run-form" autocomplete="off">
+      <input id="input" type="text" value="age=34 member=y vip=n" maxlength="511"
+             spellcheck="false" aria-label="request">
+      <button type="submit" id="run">Run</button>
+    </form>
+    <span id="verdict" class="verdict" hidden></span>
+  </header>
+  <div class="chips" id="samples" aria-label="sample requests"></div>
+  <div class="status" id="status">Loading…</div>
+
+  <div class="layout">
+    <nav id="tree" aria-label="target source files"></nav>
+    <main>
+      <div class="filebar">
+        <strong id="filename"></strong>
+        <span class="legend">
+          <span class="badge T">T</span> true
+          <span class="badge F">F</span> false
+          <span class="badge">–</span> not evaluated (short-circuit)
+          <span class="badge M">T/F</span> both values in one run
+          <span class="badge result">→ true</span> outcome of the decision
+        </span>
+      </div>
+      <div class="code" id="code" role="region" aria-label="source"></div>
+      <section class="decisions" id="decisions" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
