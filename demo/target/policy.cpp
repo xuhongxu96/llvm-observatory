@@ -1,5 +1,7 @@
 #include "policy.h"
 
+#include "stacktrace.h"
+
 namespace {
 
 struct Request {
@@ -47,7 +49,10 @@ bool age_value(const char* v, int n, int* out) {
     if (!is_digit(v[i])) return false;
     age = age * 10 + (v[i] - '0');
   }
-  if (age > 200) return false;
+  if (age > 200) {
+    print_stacktrace();  // records how run_policy reached this check
+    return false;
+  }
   *out = age;
   return true;
 }

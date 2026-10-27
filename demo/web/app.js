@@ -3,6 +3,7 @@
 // condition inline in the source.
 import { decisionsFromExport, singleConditions, valueLabel, vectorText } from './coverage.mjs';
 import { loadPolicy, runPolicy } from './policy.mjs';
+import { resolveStacks } from './stacktrace.mjs';
 import { runTool } from './llvm.mjs';
 
 const FILES = ['policy.cpp', 'policy.h'];  // target source files shown in the tree
@@ -29,6 +30,7 @@ const state = {
   current: TRACED,   // file shown in the source view
   decisions: [],     // MC/DC decisions of the last run
   conditions: [],    // plain if/while conditions of the last run
+  stacks: [],        // print_stacktrace() calls of the last run
   busy: false,
 };
 
@@ -207,6 +209,32 @@ function cell(tag, text) {
   return el;
 }
 
+// print_stacktrace() calls of the run: each frame with the file and line it is executing
+// (the innermost is the print_stacktrace() call). Hidden when there are none.
+function renderStacks() {
+  const section = $('stacks');
+  section.replaceChildren();
+  if (state.stacks.length === 0) return;
+
+  const title = document.createElement('h2');
+  title.textContent = `Stack traces: ${state.stacks.length} call(s) of print_stacktrace()`;
+  section.append(title);
+  for (const frames of state.stacks) {
+    const box = document.createElement('div');
+    box.className = 'decision';
+    const head = document.createElement('header');
+    head.textContent = 'call stack, innermost first';
+    box.append(head);
+    for (const [i, frame] of frames.entries()) {
+      const where = frame.file ? `${frame.file}:${frame.line}` : 'unknown';
+      const row = cell('div', `${'  '.repeat(i)}${frame.name}   at ${where}`);
+      row.style.whiteSpace = 'pre-wrap';
+      box.append(row);
+    }
+    section.append(box);
+  }
+}
+
 function renderTree() {
   const nav = $('tree');
   nav.replaceChildren(cell('div', 'target/'));
@@ -256,6 +284,8 @@ async function submit(text) {
   try {
     const run = runPolicy(state.policy, text);
     setVerdict(run.accepted, run.result);
+    state.stacks = await resolveStacks(state.wasmBytes, run.stacks);
+    renderStacks();
     setStatus('Decoding this run’s coverage profile with llvm-cov…');
     ({ decisions: state.decisions, conditions: state.conditions } = await decode(run.profile));
     selectFile(state.current);
@@ -271,8 +301,8 @@ async function submit(text) {
 async function load() {
   setStatus('Loading policy.wasm and sources…');
   const [wasmBytes, ...sources] = await Promise.all([
-    fetch('policy.wasm').then((r) => r.arrayBuffer()),
-    ...FILES.map((name) => fetch(`src/${name}`).then((r) => r.text())),
+    fetch('build/policy.wasm').then((r) => r.arrayBuffer()),
+    ...FILES.map((name) => fetch(`build/sources/${name}`).then((r) => r.text())),
   ]);
   state.wasmBytes = new Uint8Array(wasmBytes);
   state.sources = Object.fromEntries(FILES.map((name, i) => [name, sources[i]]));

@@ -7,12 +7,14 @@ condition comes from the coverage profile of each run, decoded by LLVM's own
 
 ```
 flake.nix, .envrc      dev shell (emscripten, clang, cmake, ninja, node)
-target/                policy.h, policy.cpp: the code under test
+target/                policy.h, policy.cpp: the code under test; stacktrace.h
 driver/driver.cpp      wasm exports: run a request, reset and dump the profile
-scripts/build.sh       emcc: target + driver -> web/policy.wasm (copies sources to web/src/)
-scripts/build_llvm.sh  llvm-cov and llvm-profdata for WebAssembly -> web/tools/
+driver/stacktrace.cpp  print_stacktrace(): asks the page to capture the call stack
+scripts/build.sh       emcc: target (instrumented) + driver -> web/build/policy.wasm
+scripts/build_llvm.sh  llvm-cov and llvm-profdata for WebAssembly -> web/build/llvm-tools/
 scripts/trace.mjs      demo: print the value of every condition for some inputs
-web/                   the viewer: index.html, app.js, coverage.mjs, policy.mjs, llvm.mjs
+web/                   the viewer (the web root): index.html, app.js, coverage.mjs, policy.mjs, stacktrace.mjs, llvm.mjs
+web/build/             everything generated (wasm with DWARF, sources, LLVM tools); not in git
 ```
 
 ## Setup
@@ -33,12 +35,12 @@ toolchain. If emcc is upgraded, update `llvm_commit.txt` and re-run `clone_llvm.
 ## Build
 
 ```sh
-scripts/build.sh           # web/policy.wasm and web/src/
-scripts/build_llvm.sh      # web/tools/llvm-cov.*, web/tools/llvm-profdata.* (builds LLVM; takes a while)
+scripts/build.sh           # web/build/: policy.wasm (with DWARF), sources/
+scripts/build_llvm.sh      # web/build/llvm-tools/: llvm-cov, llvm-profdata (builds LLVM; takes a while)
 ```
 
 Both are needed for the web page and for the trace demo, which decodes the profile
-with the same `web/tools/` files.
+with the same `web/build/llvm-tools/` files.
 
 ## Run the web viewer
 
@@ -76,6 +78,22 @@ input: "age=34 member=y vip=n"  ->  STANDARD
   policy.cpp:113  r.age >= 18  r.age < 65  r.member  r.vip
     T  T  T  -  =>  true
 ```
+
+## Stack traces
+
+The target calls `print_stacktrace()` (`target/stacktrace.h`) where it wants the call
+path. The driver forwards the call to a JavaScript import, which reads the stack from
+`Error.stack` while the wasm frames are live. Each wasm frame there gives its function
+index and its byte offset in the module.
+
+The module keeps its DWARF (`-g`, not stripped). `web/stacktrace.mjs` passes those
+offsets to `llvm-symbolizer` (built with the other LLVM tools), which returns the
+function, file, and line of each frame. The line of an outer frame is the line that
+frame is executing, i.e. the call that is in progress. No instrumentation is needed.
+
+This follows https://lucumr.pocoo.org/2020/11/30/how-to-wasm-dwarf/. Its code-section
+offset adjustment is not needed here: llvm-symbolizer takes the module file offsets as
+they are in `Error.stack`.
 
 ## How it works
 

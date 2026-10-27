@@ -4,7 +4,7 @@
 const tools = {};
 
 export async function runTool(name, args, inputs, outputs = []) {
-  tools[name] ??= (await import(new URL(`./tools/${name}.js`, import.meta.url).href)).default;
+  tools[name] ??= (await import(new URL(`./build/llvm-tools/${name}.js`, import.meta.url).href)).default;
 
   const stdout = [];
   const stderr = [];

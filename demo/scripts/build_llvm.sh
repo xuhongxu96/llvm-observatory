@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds llvm-cov and llvm-profdata for the browser (WebAssembly, via emscripten)
-# from thirdparty/llvm-project and copies them to web/tools/.
+# from thirdparty/llvm-project and copies them to web/llvm-tools/.
 #
 #   ../clone_llvm.sh          # once: fetch the LLVM source (repo root)
 #   scripts/build_llvm.sh     # needs emcc on PATH (the flake dev shell provides it)
@@ -52,8 +52,8 @@ emcmake cmake "${COMMON[@]}" -B "$WASM" \
   -DLLVM_ENABLE_ZLIB=ON -DZLIB_LIBRARY="$ZLIB_LIB" -DZLIB_INCLUDE_DIR="$ZLIB_INC" \
   -DLLVM_NATIVE_TOOL_DIR="$HOST/bin" \
   -DCMAKE_EXE_LINKER_FLAGS="-sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8388608 -sINITIAL_MEMORY=67108864 -sMODULARIZE=1 -sEXPORT_ES6=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -sFORCE_FILESYSTEM=1"
-EMCC_CFLAGS="-sUSE_ZLIB=1" EMCC_CXXFLAGS="-sUSE_ZLIB=1" ninja -C "$WASM" -j "$JOBS" llvm-cov llvm-profdata
+EMCC_CFLAGS="-sUSE_ZLIB=1" EMCC_CXXFLAGS="-sUSE_ZLIB=1" ninja -C "$WASM" -j "$JOBS" llvm-cov llvm-profdata llvm-symbolizer
 
-mkdir -p "$ROOT/web/tools"
-cp "$WASM"/bin/llvm-cov.{js,wasm} "$WASM"/bin/llvm-profdata.{js,wasm} "$ROOT/web/tools/"
-echo "copied llvm-cov and llvm-profdata to web/tools/"
+mkdir -p "$ROOT/web/build/llvm-tools"
+cp "$WASM"/bin/llvm-cov.{js,wasm} "$WASM"/bin/llvm-profdata.{js,wasm} "$WASM"/bin/llvm-symbolizer.{js,wasm} "$ROOT/web/build/llvm-tools/"
+echo "copied llvm-cov, llvm-profdata and llvm-symbolizer to web/build/llvm-tools/"

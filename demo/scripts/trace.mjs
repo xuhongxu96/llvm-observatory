@@ -8,12 +8,13 @@ import { readFile } from 'node:fs/promises';
 import { loadPolicy, runPolicy } from '../web/policy.mjs';
 import { runTool } from '../web/llvm.mjs';
 import { decisionsFromExport, singleConditions, valueLabel } from '../web/coverage.mjs';
+import { resolveStacks } from '../web/stacktrace.mjs';
 
 const inputs = process.argv.length > 2
   ? process.argv.slice(2)
-  : ['age=34 member=y vip=n', 'age=40 vip=y holiday=y', 'age=17 member=y', 'age=x'];
+  : ['age=34 member=y vip=n', 'age=40 vip=y holiday=y', 'age=17 member=y', 'age=x', 'age=201 member=y'];
 
-const wasm = await readFile(new URL('../web/policy.wasm', import.meta.url));
+const wasm = await readFile(new URL('../web/build/policy.wasm', import.meta.url));
 const source = await readFile(new URL('../target/policy.cpp', import.meta.url), 'utf8');
 const policy = await loadPolicy(wasm);
 
@@ -22,6 +23,7 @@ const show = (v) => (v === null ? '-' : v ? 'T' : 'F');
 
 for (const text of inputs) {
   const run = runPolicy(policy, text);
+  const stacks = await resolveStacks(wasm, run.stacks);
   console.log(`\ninput: ${JSON.stringify(text)}  ->  ${run.accepted ? run.result : `rejected: ${run.result}`}`);
 
   const merged = await runTool('llvm-profdata', ['merge', '-o', '/work/run.profdata', '/work/run.profraw'],
@@ -40,5 +42,11 @@ for (const text of inputs) {
   }
   for (const c of conditions) {
     console.log(`  policy.cpp:${c.line}  ${c.keyword} (${c.text})  =>  ${valueLabel(c.values)}`);
+  }
+  for (const frames of stacks) {
+    console.log('  print_stacktrace() call stack, innermost first:');
+    for (const frame of frames) {
+      console.log(`    ${frame.name}   at ${frame.file}:${frame.line}`);
+    }
   }
 }
