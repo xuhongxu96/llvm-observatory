@@ -140,3 +140,17 @@ function expectMatch(run: Run, e: Expectation) {
     `no match call in ${e.subject} with ${JSON.stringify(e.terms)} (${calls.length} ran); the first:\n${texts[0]}`,
   );
 }
+
+// The guide's examples run, and each makes records to look at.
+test("the guide's examples", async (t) => {
+  const { HELP } = await import("../../src/web/model/help.ts");
+  for (const section of HELP.filter((s) => s.example)) {
+    await t.test(`${section.id}: ${section.example!.label}`, async () => {
+      const run = await observatory.observe(section.example!.ir);
+      assert.equal(run.status, 0, run.stderr);
+      const records = run.trace.iterations.flatMap((it) => [...it.values, ...it.replacements]);
+      assert.ok(records.length > 0, "no records");
+      if (section.id === "patterns") assert.ok(run.trace.iterations.some((it) => it.matches.length > 0), "no match calls");
+    });
+  }
+});

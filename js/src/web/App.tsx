@@ -4,6 +4,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { IrEditor } from "./components/IrEditor.tsx";
 import { OutputIrPanel } from "./components/OutputIrPanel.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
+import { HelpDialog, helpDismissed } from "./components/HelpDialog.tsx";
 import { CopyButton, Pane } from "./components/Pane.tsx";
 import type { SourceSelection } from "./components/SourceLocation.tsx";
 import { placeCrumb, start, type Navigation } from "./model/navigation.ts";
@@ -39,6 +40,17 @@ export function App() {
     observatory.run(shared.ir);
   }, [observatory, shared.ir]);
 
+  // The guide opens with the page, unless asked not to or opened from a share link.
+  const [help, setHelp] = useState(() => !shared.fromLink && !helpDismissed());
+  const tryExample = (ir: string) => {
+    setHelp(false);
+    shared.setIr(ir);
+    if (canRun) {
+      setNav(null);
+      observatory.run(ir);
+    }
+  };
+
   // A share link runs its IR once, as soon as both the IR and the driver are ready.
   const autoRun = useRef(shared.fromLink);
   useEffect(() => {
@@ -50,7 +62,8 @@ export function App() {
 
   return (
     <div className="app">
-      <Toolbar status={status} target={observatory.target} canRun={canRun} onRun={run} shareUrl={shared.shareUrl} />
+      <Toolbar status={status} target={observatory.target} canRun={canRun} onRun={run} shareUrl={shared.shareUrl} onHelp={() => setHelp(true)} />
+      {help && <HelpDialog onTry={(example) => tryExample(example.ir)} onClose={() => setHelp(false)} />}
       <main className="panes">
         <PanelGroup direction="horizontal" autoSaveId="observatory-h">
           <Panel defaultSize={45} minSize={20}>

@@ -1,6 +1,8 @@
-// Links to the observed LLVM's sources on GitHub. Patching keeps every line number, so
-// lines from the build are upstream lines.
+// Links to GitHub: this project, and the observed LLVM's sources. Patching keeps every
+// line number, so lines from the build are upstream lines.
 import type { TargetInfo } from "../../core/observatory.ts";
+
+export const PROJECT_URL = "https://github.com/xuhongxu96/llvm-observatory";
 
 const REPO = "https://github.com/llvm/llvm-project";
 
