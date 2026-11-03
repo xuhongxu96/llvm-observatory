@@ -17,6 +17,8 @@
 //   iteration_end   {iteration, ir: the module after the iteration}
 //
 // Description: {ptr, ir, opcode?, fn?, bb?, debug_loc?} (empty fields are omitted).
+// Only `value` and `replace` carry the call stack (the host captures it): it says where
+// the fold made or replaced the value.
 // Events are recorded only inside an iteration: outside one, Value::doRAUW is also used
 // by the IR parser and others, which are not under observation. `visit` is set inside a
 // visit of an instruction by InstCombine (numbered from 1 over the run).
@@ -175,7 +177,7 @@ void describe_placed() {
     S.Unplaced.erase(V);
     Json J = event("describe");
     describe(J, "value", *V);
-    host::emit(J.close().str(), /*Stack=*/false);
+    host::emit(J.close().str());
   }
 }
 
@@ -250,7 +252,7 @@ void on_value(const llvm::Value *V) {
     return;
   Json J = event("value");
   describe(J, "value", *V);
-  host::emit(J.close().str());
+  host::emit(J.close().str(), /*Stack=*/true); // where the fold made it
 }
 
 void on_delete(const llvm::Value *V) {
@@ -267,7 +269,7 @@ void on_replace(const llvm::Value *Old, const llvm::Value *New) {
   Json J = event("replace");
   describe(J, "old", *Old);
   describe(J, "new", *New);
-  host::emit(J.close().str());
+  host::emit(J.close().str(), /*Stack=*/true); // where it was replaced
 }
 
 void start_session(const llvm::Module &M) {
@@ -338,7 +340,7 @@ bool match_end(bool Matched) {
   Json J = event("match");
   J.field("file", S.Call.File).field("line", S.Call.Line).field("column", S.Call.Column);
   describe_runs(J, S.Call, S.Call.Roots);
-  host::emit(J.close().str(), /*Stack=*/false);
+  host::emit(J.close().str());
   S.InCall = false;
   return Matched;
 }

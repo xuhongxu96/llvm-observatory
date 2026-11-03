@@ -10,7 +10,7 @@ namespace llvm_obs {
 namespace host {
 
 // One event, as a JSON object; the host captures the call stack if `Stack`.
-void emit(const std::string &Json, bool Stack = true);
+void emit(const std::string &Json, bool Stack = false);
 
 // The raw coverage profile (.profraw) of a coverage segment.
 void emit_profile(long Segment, const std::vector<char> &Profile);
