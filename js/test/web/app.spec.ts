@@ -13,9 +13,9 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first()).toBeVisible();
   await expect(page.getByText("Optimized IR")).toBeVisible();
 
-  // The optimized IR after one iteration: the module as the next pass gets it.
+  // The optimized IR after each iteration, the last (final) one by default.
   const picker = page.getByLabel("IR after");
-  await expect(picker).toHaveValue("final");
+  await expect(picker.locator("option:checked")).toHaveText(/: final$/);
   await picker.selectOption({ label: "after iteration 1 (instcombine)" });
   await expect(page.locator(".pane", { hasText: "Optimized IR" }).locator(".view-lines")).toContainText("shl i32 %x, 1");
 

@@ -11,36 +11,40 @@ vi.mock("../../src/web/components/IrEditor.tsx", () => ({
 }));
 
 const RESULT: RunResult = { status: 0, stderr: "", outputIr: "; final module", trace: TRACE };
+const picker = () => screen.getByLabelText("IR after") as HTMLSelectElement;
+const shown = () => screen.getByTestId("ir").textContent;
 
 afterEach(cleanup);
 
 describe("OutputIrPanel", () => {
-  it("shows the final IR by default and the IR after a chosen iteration", () => {
+  it("lists the iterations and shows the last one by default", () => {
     render(<OutputIrPanel result={RESULT} />);
-    const picker = screen.getByLabelText("IR after") as HTMLSelectElement;
-    expect([...picker.options].map((o) => o.text)).toEqual([
-      "final",
+    expect([...picker().options].map((o) => o.text)).toEqual([
       "after iteration 1 (instcombine)",
-      "after iteration 2 (instcombine)",
+      "after iteration 2 (instcombine): final",
     ]);
-    expect(screen.getByTestId("ir").textContent).toBe("; final module");
-
-    fireEvent.change(picker, { target: { value: "1" } });
-    expect(screen.getByTestId("ir").textContent).toContain("%b = shl i32 %x, 1");
+    expect(picker().value).toBe("2");
+    expect(shown()).toBe(TRACE.iterations[1].irAfter);
   });
 
-  it("goes back to the final IR on a new run", () => {
+  it("shows the IR after a chosen iteration, until the next run", () => {
     const { rerender } = render(<OutputIrPanel result={RESULT} />);
-    fireEvent.change(screen.getByLabelText("IR after"), { target: { value: "1" } });
-    rerender(<OutputIrPanel result={{ ...RESULT, outputIr: "; next run" }} />);
-    expect(screen.getByTestId("ir").textContent).toBe("; next run");
-    expect((screen.getByLabelText("IR after") as HTMLSelectElement).value).toBe("final");
+    fireEvent.change(picker(), { target: { value: "1" } });
+    expect(shown()).toContain("%b = shl i32 %x, 1");
+    rerender(<OutputIrPanel result={{ ...RESULT }} />);
+    expect(picker().value).toBe("2");
+  });
+
+  it("shows the driver's output when no iteration ran", () => {
+    render(<OutputIrPanel result={{ ...RESULT, trace: { iterations: [] } }} />);
+    expect(screen.queryByLabelText("IR after")).toBeNull();
+    expect(shown()).toBe("; final module");
   });
 
   it("shows the driver's error, without a picker", () => {
     render(<OutputIrPanel result={{ ...RESULT, status: 1, stderr: "error: expected type" }} />);
     expect(screen.getByText("Driver error")).toBeTruthy();
-    expect(screen.getByTestId("ir").textContent).toBe("error: expected type");
-    expect((screen.getByLabelText("IR after") as HTMLSelectElement).disabled).toBe(true);
+    expect(shown()).toBe("error: expected type");
+    expect(screen.queryByLabelText("IR after")).toBeNull();
   });
 });
