@@ -470,7 +470,14 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 /* The source pane: an observed source with MC/DC badges. */
 .source-view { display: flex; flex-direction: column; height: 100%; }
 .source-status { padding: 0.3rem 0.7rem; color: var(--muted); font-size: 0.8rem; border-bottom: 1px solid var(--border); }
-.source-editor { flex: 1; min-height: 0; }
+.source-editor { flex: 1; min-height: 0; position: relative; }
+.badge-tip {
+  z-index: 50;
+  font-size: 13px;
+  pointer-events: none;
+}
+.badge-tip .monaco-tokenized-source { font-family: var(--monaco-monospace-font); white-space: pre; }
+.badge-tip.above { transform: translateY(-100%); }
 .source-editor.linked .margin .line-numbers { cursor: pointer; }
 .source-editor.linked .margin .line-numbers:hover { color: var(--accent); text-decoration: underline; }
 .source-line-hit { background: var(--hit); }

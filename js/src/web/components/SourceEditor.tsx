@@ -1,11 +1,14 @@
 // An observed source in a read-only editor: C++ highlighting (src/web/monaco/cpp.ts), the
-// MC/DC badges of the iteration after their conditions (hover one for its test vectors),
+// MC/DC badges of the iteration after their conditions (hover one for its test vectors:
+// a tip of our own, since Monaco's hovers follow source columns, and over a badge,
+// text injected between two columns, Monaco often takes the next column),
 // annotations (underlined, with a hover; e.g. a match call's matchers), the current line
 // and the lines that evaluated conditions marked, line numbers that open the line on
 // GitHub, and Ctrl/⌘+click or F12 on a name to follow it (to its definition).
 import MonacoEditor, { type OnMount } from "@monaco-editor/react";
 import type * as monacoApi from "monaco-editor";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { TargetInfo } from "../../core/observatory.ts";
 import { callArguments } from "../../core/tags.ts";
 import { useMonacoTheme } from "../hooks/useColorScheme.ts";
@@ -47,6 +50,8 @@ export function SourceEditor({ path, source, marks, annotations, line, target, o
   const theme = useMonacoTheme();
   const [mounted, setMounted] = useState<{ editor: Editor; monaco: Monaco } | null>(null);
   const decorations = useRef<monacoApi.editor.IEditorDecorationsCollection | null>(null);
+  const badgeTitles = useRef<string[]>([]);
+  const [tip, setTip] = useState<Tip | null>(null);
   // The line kept in the middle of the editor until the user scrolls: the editor's
   // height changes as its panel opens, which would otherwise leave the line near the top.
   const anchor = useRef<number | null>(null);
@@ -60,6 +65,7 @@ export function SourceEditor({ path, source, marks, annotations, line, target, o
     decorations.current = editor.createDecorationsCollection();
     editor.onDidLayoutChange(() => center(editor));
     editor.onDidScrollChange((e) => {
+      setTip(null);
       if (e.scrollTopChanged && !centering.current) anchor.current = null; // the user scrolled
     });
     editor.onMouseDown((e) => {
@@ -87,8 +93,11 @@ export function SourceEditor({ path, source, marks, annotations, line, target, o
 
   useEffect(() => {
     if (!mounted) return;
+    const source = sourceDecorations(mounted.monaco, marks, line);
+    badgeTitles.current = source.titles;
+    setTip(null);
     decorations.current?.set([
-      ...sourceDecorations(mounted.monaco, marks, line),
+      ...source.decorations,
       ...annotations.map((a) => annotationDecoration(mounted.monaco, a)),
     ]);
   }, [mounted, marks, annotations, line, source]);
@@ -106,8 +115,39 @@ export function SourceEditor({ path, source, marks, annotations, line, target, o
     centering.current = false;
   }
 
+  // The badge under the mouse, by the browser's own hit test (the badge's element).
+  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const badge = (e.target as Element).closest?.(".badge");
+    const index = Number(badge?.className.match(/\bbadge-(\d+)\b/)?.[1] ?? NaN);
+    const text = badgeTitles.current[index];
+    if (!badge || text === undefined) {
+      if (tip) setTip(null);
+      return;
+    }
+    if (tip?.index === index) return;
+    const frame = mounted?.editor.getDomNode()?.getBoundingClientRect();
+    if (!frame) return;
+    const box = badge.getBoundingClientRect();
+    const below = box.bottom - frame.top < frame.height / 2;
+    setTip({ index, text, left: box.left - frame.left, top: below ? box.bottom - frame.top + 4 : box.top - frame.top - 4, below });
+  };
+
   return (
-    <div className={`source-editor${target ? " linked" : ""}`}>
+    <div className={`source-editor${target ? " linked" : ""}`} onMouseMove={onMouseMove} onMouseLeave={() => setTip(null)}>
+      {tip &&
+        mounted?.editor.getDomNode() &&
+        // Monaco's hover as its markdown hovers render a code block, inside the editor's
+        // element (its theme's colors and fonts).
+        createPortal(
+          <div className={`monaco-hover badge-tip${tip.below ? "" : " above"}`} style={{ left: tip.left, top: tip.top }} role="tooltip">
+            <div className="hover-row markdown-hover">
+              <div className="hover-contents">
+                <div className="monaco-tokenized-source">{tip.text}</div>
+              </div>
+            </div>
+          </div>,
+          mounted.editor.getDomNode()!,
+        )}
       <MonacoEditor
         path={`sources/${path}`}
         value={source}
@@ -130,28 +170,40 @@ export function SourceEditor({ path, source, marks, annotations, line, target, o
   );
 }
 
+// A badge's tip, placed below the badge (above it in the lower half of the editor).
+interface Tip {
+  index: number; // of the badge
+  text: string;
+  left: number;
+  top: number;
+  below: boolean;
+}
+
+// The decorations of the marks, and the badges' titles by index (the badges' elements
+// carry their index as a class: badge-<index>).
 function sourceDecorations(monaco: Monaco, marks: SourceMarks | null, line: number | null) {
   const out: monacoApi.editor.IModelDeltaDecoration[] = [];
+  const titles: string[] = [];
   const wholeLine = (n: number, className: string) =>
     out.push({ range: new monaco.Range(n, 1, n, 1), options: { isWholeLine: true, className } });
 
   for (const [n, badges] of marks?.badges ?? []) {
     if (n !== line) wholeLine(n, "source-line-hit");
-    for (const badge of badges) out.push(badgeDecoration(monaco, n, badge));
+    for (const badge of badges) {
+      out.push(badgeDecoration(monaco, n, badge, titles.length));
+      titles.push(badge.title);
+    }
   }
   if (line) wholeLine(line, "source-line-current");
-  return out;
+  return { decorations: out, titles };
 }
 
-// The badge goes after the character before its column, which carries its hover.
-function badgeDecoration(monaco: Monaco, n: number, badge: Badge): monacoApi.editor.IModelDeltaDecoration {
+// The badge goes after the character before its column.
+function badgeDecoration(monaco: Monaco, n: number, badge: Badge, index: number): monacoApi.editor.IModelDeltaDecoration {
   const column = Math.max(badge.column, 1); // 1-based column of that character
   return {
     range: new monaco.Range(n, column, n, column + 1),
-    options: {
-      after: { content: badge.text, inlineClassName: `badge ${badge.kind}` },
-      hoverMessage: { value: ["```", badge.title, "```"].join("\n") },
-    },
+    options: { after: { content: badge.text, inlineClassName: `badge ${badge.kind} badge-${index}` } },
   };
 }
 

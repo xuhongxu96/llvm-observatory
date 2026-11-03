@@ -46,6 +46,16 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   expect(position).toBeLessThan(0.65);
   await expect(page.locator(".source-status")).toContainText("evaluated in visit 1", { timeout: 60_000 });
   await expect(source.locator(".badge").first()).toBeVisible();
+  // A badge's tip shows over all of it, to its edges.
+  const badge = (await source.locator(".badge").first().boundingBox())!;
+  for (const x of [1, badge.width / 2, badge.width - 1]) {
+    await page.mouse.move(0, 0);
+    await expect(page.locator(".badge-tip")).toHaveCount(0);
+    await page.mouse.move(badge.x + x, badge.y + badge.height / 2);
+    await expect(page.locator(".badge-tip")).toContainText("× true");
+  }
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".badge-tip")).toHaveCount(0);
   // Highlighted as C++ (tree-sitter semantic tokens): a method call in the theme's function color.
   await expect(source.locator(".view-line span", { hasText: /^getOperand$/ }).first()).toHaveCSS("color", "rgb(121, 94, 38)", {
     timeout: 30_000,
