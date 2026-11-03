@@ -138,3 +138,14 @@ describe("summarize with one header function instantiated twice", () => {
     expect(file.branches).toEqual([{ line: 12, col: 9, endLine: 12, endCol: 12, trueCount: 2, falseCount: 2 }]);
   });
 });
+
+describe("regions that do not fit the source", () => {
+  it("are skipped, not placed", () => {
+    const file = {
+      decisions: [{ line: 40, col: 1, endLine: 41, endCol: 5, conditionCount: 2, vectors: [[true, true]], results: [true] }],
+      branches: [{ line: 50, col: 7, endLine: 50, endCol: 8, trueCount: 1, falseCount: 0 }],
+    };
+    expect(decisions(file, "short\nsource")).toEqual([]);
+    expect(singleConditions(file, "short\nsource")).toEqual([]);
+  });
+});

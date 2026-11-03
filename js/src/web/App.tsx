@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { IrEditor } from "./components/IrEditor.tsx";
 import { OutputIrPanel } from "./components/OutputIrPanel.tsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { CopyButton, Pane } from "./components/Pane.tsx";
 import type { SourceSelection } from "./components/SourceLocation.tsx";
 import { SourcePane } from "./components/SourcePane.tsx";
@@ -69,13 +70,15 @@ export function App() {
                 <>
                   <PanelResizeHandle className="pane-resize-handle horizontal" />
                   <Panel id="source" order={2} defaultSize={45} minSize={15}>
-                    <SourcePane
-                      selection={selection}
-                      target={observatory.target}
-                      coverage={observatory.coverage}
-                      onOpen={setSelection}
-                      onClose={() => setSelection(null)}
-                    />
+                    <ErrorBoundary key={`${selection.iteration}:${selection.path}`}>
+                      <SourcePane
+                        selection={selection}
+                        target={observatory.target}
+                        coverage={observatory.coverage}
+                        onOpen={setSelection}
+                        onClose={() => setSelection(null)}
+                      />
+                    </ErrorBoundary>
                   </Panel>
                 </>
               )}

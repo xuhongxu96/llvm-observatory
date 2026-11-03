@@ -36,6 +36,12 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 
+  // A frame in a source the build does not ship says so (the server must not answer
+  // with the app's own page instead).
+  await page.locator("details.trace-frames summary").first().click();
+  await page.locator(".trace-frames").first().getByRole("button", { name: /^Instruction\.def:/ }).click();
+  await expect(page.getByText("include/llvm/IR/Instruction.def is not in this build's sources")).toBeVisible();
+
   // The iteration's overview lists the sources it evaluated conditions in.
   await page.getByRole("button", { name: "conditions" }).first().click();
   await expect(page.getByRole("button", { name: "lib/Analysis/InstructionSimplify.cpp" })).toBeVisible({ timeout: 60_000 });

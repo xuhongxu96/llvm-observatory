@@ -8,6 +8,8 @@ const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 // served as its public directory, at the site root.
 export default defineConfig({
   root: here("src/web"),
+  // Not a single-page app: an unknown path is a 404, not index.html (see src/web/sources.ts).
+  appType: "mpa",
   base: "./",
   publicDir: here("../build/dist"),
   plugins: [react()],

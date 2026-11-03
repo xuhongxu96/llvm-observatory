@@ -166,9 +166,12 @@ export interface SingleCondition extends TakenBranch {
   values: boolean[];
 }
 
+// A region of a different version of the source can lie past its end.
+const fits = (lines: string[], r: Region) => r.line >= 1 && r.line <= r.endLine && r.endLine <= lines.length;
+
 export function decisions(file: FileCoverage, source: string): Decision[] {
   const lines = source.split("\n");
-  return file.decisions.map((d) => {
+  return file.decisions.filter((d) => fits(lines, d)).map((d) => {
     // The region of a decision in `return a && b;` ends at the semicolon.
     const text = spanText(lines, d).replace(/;\s*$/, "");
     const names = conditionTexts(text);
@@ -205,7 +208,7 @@ const CONDITION_HEAD = /\b(if|while)\s*\(\s*(?:[\w:<>,]+(?:\s+[\w:<>,]+)*[\s*&]+
 export function singleConditions(file: FileCoverage, source: string): SingleCondition[] {
   const lines = source.split("\n");
   const out: SingleCondition[] = [];
-  for (const b of file.branches) {
+  for (const b of file.branches.filter((r) => fits(lines, r))) {
     const head = lines[b.line - 1]?.slice(0, b.col - 1).match(CONDITION_HEAD);
     if (!head) continue;
     const values: boolean[] = [];

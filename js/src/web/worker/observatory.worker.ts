@@ -2,6 +2,7 @@
 // LLVM tools are large. Keeps the last run so the app can ask for an iteration's coverage.
 import type { ModuleFactory, ModuleSource } from "../../core/emscripten.ts";
 import { Observatory, type Dist, type Run, type TargetInfo } from "../../core/observatory.ts";
+import { fetchSource } from "../sources.ts";
 import type { WorkerRequest, WorkerResponse } from "./protocol.ts";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -64,10 +65,7 @@ function remoteDist(base: string): Dist {
     driver: module("driver/observatory_driver"),
     tool: (name) => module(`llvm-tools/${name}`),
     target: async () => (await (await fetchOk(url("target.json"))).json()) as TargetInfo,
-    source: async (path) => {
-      const response = await fetch(url(`sources/${path}`));
-      return response.ok ? response.text() : null;
-    },
+    source: (path) => fetchSource(base, path),
   };
 }
 
