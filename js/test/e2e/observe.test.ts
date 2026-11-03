@@ -4,9 +4,11 @@
 //   ; expect value `<ir>`: term, term     a value record whose IR is <ir>
 //   ; expect replace `<ir>`: term, term   a replacement of the value whose IR is <ir>
 //   ; expect mcdc <path>: term, term      a condition evaluated in <path> (under llvm/)
+//   ; requires LLVM >= <major>            skip the file for older targets
 //
-// A record matches when every term occurs in it: its functions, paths, or the source
-// lines its frames point at. A condition matches when every term occurs in its text.
+// A record matches when every term occurs in it, ignoring case (LLVM renamed functions
+// such as SimplifyAddInst): its functions, paths, or the source lines its frames point
+// at. A condition matches when every term occurs in its text.
 //
 //   node --test test/e2e/observe.test.ts [--dist DIR via OBSERVATORY_DIST]
 import assert from "node:assert/strict";
@@ -28,6 +30,8 @@ interface Expectation {
 }
 
 const EXPECT = /^;\s*expect (value|replace|mcdc) (?:`([^`]*)`|(\S+)):\s*(.*)$/;
+const REQUIRES = /^;\s*requires LLVM >= (\d+)\s*$/m;
+const targetMajor = Number((await dist.target()).version.split(".")[0]);
 
 function expectations(ir: string): Expectation[] {
   return ir.split("\n").flatMap((line) => {
@@ -39,8 +43,9 @@ function expectations(ir: string): Expectation[] {
 }
 
 for (const name of readdirSync(INPUTS).filter((f) => f.endsWith(".ll")).sort()) {
-  test(name, async (t) => {
-    const ir = readFileSync(new URL(name, INPUTS), "utf8");
+  const ir = readFileSync(new URL(name, INPUTS), "utf8");
+  const required = Number(ir.match(REQUIRES)?.[1] ?? 0);
+  test(name, { skip: targetMajor < required && `needs LLVM >= ${required}` }, async (t) => {
     const expected = expectations(ir);
     assert.ok(expected.length > 0, `${name} has no expectations`);
 
@@ -65,7 +70,7 @@ async function expectRecord(run: Run, e: Expectation) {
   );
   assert.ok(records.length > 0, `no ${e.kind} record for \`${e.subject}\``);
   const texts = await Promise.all(records.map(recordText));
-  const missing = (text: string) => e.terms.filter((term) => !text.includes(term));
+  const missing = (text: string) => e.terms.filter((term) => !text.toLowerCase().includes(term.toLowerCase()));
   if (!texts.some((text) => missing(text).length === 0)) {
     assert.fail(`\`${e.subject}\`: missing ${JSON.stringify(missing(texts[0]))} in\n${texts[0]}`);
   }

@@ -83,7 +83,7 @@ class FunctionEntry:
 
 REPLACE = FunctionEntry(
     name="replace",
-    candidates=("Value::doRAUW", "Value::replaceAllUsesWith"),
+    candidates=("Value::doRAUW",),
     statement="llvm_obs::on_replace(this, {first_param});",
 )
 

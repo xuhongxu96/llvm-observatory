@@ -65,18 +65,24 @@ require_emscripten() {
 }
 
 # build_tblgen <tree> <build dir>: native llvm-tblgen (and llvm-min-tblgen, LLVM >= 17)
-# for cross-building <tree> to wasm.
+# for cross-building <tree> to wasm. Without optional system libraries: tblgen needs
+# none, and a library found at build time (e.g. libtinfo) may be missing when it runs.
 build_tblgen() {
   local tree=$1 dir=$2 targets=(llvm-tblgen)
   [ "$(llvm_major "$tree")" -ge 17 ] && targets+=(llvm-min-tblgen)
-  cmake -G Ninja -S "$tree/llvm" -B "$dir" "${CCACHE[@]}" \
+  cmake -G Ninja -S "$tree/llvm" -B "$dir" "${CCACHE[@]}" "${CMAKE_COMPAT[@]}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
     -DLLVM_TARGETS_TO_BUILD= \
     -DLLVM_ENABLE_PROJECTS= \
-    -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF
+    -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+    -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_LIBEDIT=OFF -DLLVM_ENABLE_LIBXML2=OFF \
+    -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF
   ninja -C "$dir" -j "$JOBS" "${targets[@]}"
 }
 
 CCACHE=()
 command -v ccache >/dev/null && CCACHE=(-DLLVM_CCACHE_BUILD=ON)
+
+# CMake 4 rejects projects that declare compatibility with CMake < 3.5, as LLVM <= 10 does.
+CMAKE_COMPAT=(-DCMAKE_POLICY_VERSION_MINIMUM=3.5)

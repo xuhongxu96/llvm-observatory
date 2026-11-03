@@ -46,6 +46,13 @@ describe("buildTrace", () => {
     ]);
   });
 
+  it("does not take a helper from an InstCombine header as the rule", () => {
+    const helper = frame("llvm::InstCombiner::replaceInstUsesWith(...)", "lib/Transforms/InstCombine/InstCombineInternal.h", 616);
+    const withHelper: Symbols = new Map([...symbols, [5, [helper]]]);
+    const [first] = buildTrace([events[0], { ...events[1], stack: [{ offset: 5, name: null }, ...stack] }], withHelper).iterations;
+    expect(first.values[0].rule?.function).toContain("visitAdd");
+  });
+
   it("takes the innermost InstCombine frame as the rule", () => {
     expect(trace.iterations[0].values[0].rule?.line).toBe(1556);
     expect(trace.iterations[0].replacements[0].rule?.function).toContain("visitAdd");

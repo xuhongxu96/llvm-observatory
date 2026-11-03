@@ -44,10 +44,12 @@ observed sources. No LLVM CMake file is patched.
 | tree | ref | role |
 |---|---|---|
 | `thirdparty/llvm-infra` | `infra_commit.txt` | the LLVM of emcc's clang; builds `llvm-cov`, `llvm-profdata`, `llvm-symbolizer` |
-| `thirdparty/llvm-target` | `target_commit.txt` or any ref | patched and observed |
+| `thirdparty/llvm-target` | `target_commit.txt` or any ref of LLVM 8 or later | patched and observed |
 
 emcc's clang writes the coverage profile, so the tools that read it must come from
-emcc's LLVM, whatever the target is. Both trees are worktrees of the clone in
+emcc's LLVM, whatever the target is. Targets from LLVM 8 on are supported (built and
+tested: 8, 9, 10, 15 and main); `patcher/compat.py` holds the few source fixups old
+releases need to build with today's compilers. Both trees are worktrees of the clone in
 `thirdparty/llvm-project`.
 
 ## Layout

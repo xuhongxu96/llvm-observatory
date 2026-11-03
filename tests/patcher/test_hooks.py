@@ -86,15 +86,6 @@ def test_replace_hook_uses_the_first_parameter():
     assert out.count("on_replace") == 1
 
 
-def test_replace_hook_falls_back_to_older_spelling():
-    out = patch(hooks.REPLACE, """
-        void Value::replaceAllUsesWith(Value *NewV) {
-          use_begin();
-        }
-        """)
-    assert "{ llvm_obs::on_replace(this, NewV);" in out
-
-
 def test_iteration_scope_opens_the_body():
     hook = hooks.iteration("instcombine", ("InstCombinerImpl::run", "InstCombiner::run"))
     out = patch(hook, """

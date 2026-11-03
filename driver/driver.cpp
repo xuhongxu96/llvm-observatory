@@ -5,7 +5,6 @@
 
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
-#include "llvm/Config/llvm-config.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -24,13 +23,6 @@ namespace {
 
 const char *const InputPath = "/work/input.ll";
 const char *const OutputPath = "/work/output.ll";
-
-// sys::fs::OF_Text was F_Text before LLVM 7.
-#if LLVM_VERSION_MAJOR < 7
-const auto TextFile = llvm::sys::fs::F_Text;
-#else
-const auto TextFile = llvm::sys::fs::OF_Text;
-#endif
 
 // PassBuilder takes an LLVMContext only in some releases.
 template <typename PB = llvm::PassBuilder> PB makePassBuilder(llvm::LLVMContext &Ctx) {
@@ -65,7 +57,7 @@ void runPasses(llvm::Module &M) {
 
 bool writeModule(const llvm::Module &M) {
   std::error_code EC;
-  llvm::raw_fd_ostream Out(OutputPath, EC, TextFile);
+  llvm::raw_fd_ostream Out(OutputPath, EC, llvm::sys::fs::OF_Text);
   if (EC) {
     llvm::errs() << "driver: cannot write " << OutputPath << ": " << EC.message() << "\n";
     return false;

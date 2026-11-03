@@ -1,4 +1,5 @@
 ; AggressiveInstCombine recognizes a bit-twiddling population count.
+; requires LLVM >= 10
 
 define i32 @popcount32(i32 %x) {
   entry:

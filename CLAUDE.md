@@ -19,7 +19,8 @@ layout and its commands; read it first.
   gate.
 - **No LLVM CMake file is patched.** `driver/CMakeLists.txt` is an LLVM external
   project, configured after `llvm/lib`. It sets the observed sources' flags and the link.
-- **`hooks.h` stays C++14** (old LLVM releases build as C++14).
+- **Targets are LLVM 8 and later.** Code for older releases is not kept. `hooks.h` stays
+  C++11-compatible (LLVM 8 and 9 build as C++11).
 - **The tools match emcc, not the target.** `llvm-cov`/`llvm-profdata`/`llvm-symbolizer`
   are built from the infra tree (`infra_commit.txt`, emcc's LLVM) and read profiles of
   any target.

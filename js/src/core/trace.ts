@@ -6,8 +6,10 @@ import type { Frame, Iteration, Trace } from "./types.ts";
 // The observatory's own frames (runtime and hooks) say nothing about the fold.
 const isObservatoryFrame = (f: Frame) => shortName(f.function).startsWith("llvm_obs::");
 
-// Folds live in the InstCombine and AggressiveInstCombine sources.
-const RULE_SOURCE = /^lib\/Transforms\/(Aggressive)?InstCombine\//;
+// Folds are defined in the InstCombine and AggressiveInstCombine .cpp files; their
+// headers hold helpers (e.g. replaceInstUsesWith, in InstCombineInternal.h before
+// LLVM 12) that every fold calls.
+const RULE_SOURCE = /^lib\/Transforms\/(Aggressive)?InstCombine\/[^/]+\.cpp$/;
 
 export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
   const iterations: Iteration[] = [];

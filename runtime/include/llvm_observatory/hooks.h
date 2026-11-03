@@ -1,6 +1,6 @@
 // The interface between a patched LLVM tree and the observatory runtime. The patcher
 // (patcher/hooks.py) inserts calls to these hooks, and the driver build force-includes
-// this header into the patched sources. It stays C++14: old LLVM releases build as C++14.
+// this header into the patched sources. It stays C++11: LLVM 8 and 9 build as C++11.
 #ifndef LLVM_OBSERVATORY_HOOKS_H
 #define LLVM_OBSERVATORY_HOOKS_H
 

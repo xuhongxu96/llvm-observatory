@@ -15,7 +15,7 @@ build_tblgen "$TARGET" "$HOST"
 tblgen=(-DLLVM_TABLEGEN="$HOST/bin/llvm-tblgen")
 [ -x "$HOST/bin/llvm-min-tblgen" ] && tblgen+=(-DLLVM_MIN_TABLEGEN="$HOST/bin/llvm-min-tblgen")
 
-emcmake cmake -G Ninja -S "$TARGET/llvm" -B "$WASM" "${CCACHE[@]}" "${tblgen[@]}" \
+emcmake cmake -G Ninja -S "$TARGET/llvm" -B "$WASM" "${CCACHE[@]}" "${CMAKE_COMPAT[@]}" "${tblgen[@]}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_TARGETS_TO_BUILD= \
   -DLLVM_ENABLE_PROJECTS= \

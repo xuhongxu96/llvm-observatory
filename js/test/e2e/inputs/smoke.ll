@@ -13,7 +13,7 @@ entry:
 }
 
 ; expect value `i32 %x`: simplifyAddInst, visitAdd, InstructionSimplify.cpp
-; expect replace `%a = add i32 %x, 0`: visitAdd, InstCombinerImpl::run
-; expect value `float 3.000000e+00`: ConstantFoldBinaryOpOperands, visitFAdd
+; expect replace `%a = add i32 %x, 0`: visitAdd, combineInstructionsOverFunction
+; expect value `float 3.000000e+00`: visitFAdd, InstCombineAddSub.cpp
 ; expect mcdc lib/Analysis/InstructionSimplify.cpp: m_Zero
 ; expect mcdc include/llvm/IR/PatternMatch.h: hasOneUse

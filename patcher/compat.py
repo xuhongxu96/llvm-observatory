@@ -13,25 +13,27 @@ from pathlib import Path
 Fixup = Callable[[Path, int], str | None]
 
 
-# Headers that use fixed-width integer types without including <cstdint>, which current
-# C++ standard libraries no longer include for them, with the last LLVM major that
-# needs it.
-MISSING_CSTDINT = {
-    "llvm/include/llvm/Support/Signals.h": 13,
-    "llvm/include/llvm/ADT/SmallVector.h": 15,
+# Headers that use standard library names without including them, which current C++
+# standard libraries no longer include for them: header -> (the last LLVM major that
+# needs the includes, the includes).
+MISSING_INCLUDES = {
+    "llvm/include/llvm/Demangle/MicrosoftDemangleNodes.h": (8, ("<cstdint>", "<string>")),
+    "llvm/include/llvm/Support/Signals.h": (13, ("<cstdint>",)),
+    "llvm/include/llvm/ADT/SmallVector.h": (15, ("<cstdint>",)),
 }
 
 
-def cstdint_includes(tree: Path, major: int) -> str | None:
-    """Includes <cstdint> where old headers rely on getting it from elsewhere."""
+def missing_includes(tree: Path, major: int) -> str | None:
+    """Adds the standard headers that old LLVM headers rely on getting from elsewhere."""
     fixed = []
-    for header, last in MISSING_CSTDINT.items():
+    for header, (last, includes) in MISSING_INCLUDES.items():
         path = tree / header
         if major > last or not path.is_file():
             continue
-        if _insert_before(path, "#include ", "#include <cstdint>\n"):
-            fixed.append(header)
-    return f"<cstdint> in {', '.join(fixed)}" if fixed else None
+        lines = "".join(f"#include {name}\n" for name in includes)
+        if _insert_before(path, "#include ", lines):
+            fixed.append(f"{', '.join(includes)} in {header}")
+    return "; ".join(fixed) or None
 
 
 def path_inc_emscripten(tree: Path, major: int) -> str | None:
@@ -76,7 +78,11 @@ def mc_vcsrevision_dependency(tree: Path, major: int) -> str | None:
     return _insert_after(cmake, anchor, "  llvm_vcsrevision_h\n")
 
 
-FIXUPS: tuple[Fixup, ...] = (cstdint_includes, path_inc_emscripten, mc_vcsrevision_dependency)
+FIXUPS: tuple[Fixup, ...] = (
+    missing_includes,
+    path_inc_emscripten,
+    mc_vcsrevision_dependency,
+)
 
 
 def _insert_before(path: Path, anchor: str, text: str) -> str | None:
