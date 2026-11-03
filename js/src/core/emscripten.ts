@@ -1,8 +1,15 @@
 // The parts of an emscripten ES-module factory (-sMODULARIZE -sEXPORT_ES6) that we use,
 // and module loading that reuses one compiled WebAssembly.Module across instances.
 
+export interface EmscriptenStream {
+  fd: number;
+}
+
 export interface EmscriptenFS {
   mkdir(path: string): void;
+  open(path: string, flags: string): EmscriptenStream;
+  close(stream: EmscriptenStream): void;
+  getStream(fd: number): EmscriptenStream;
   writeFile(path: string, data: string | Uint8Array): void;
   readFile(path: string): Uint8Array;
   readFile(path: string, opts: { encoding: "utf8" }): string;

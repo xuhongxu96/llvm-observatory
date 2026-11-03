@@ -38,9 +38,19 @@ was found the hard way:
   COMDAT copy at the copy it keeps. When the kept copy came from an optimized,
   uninstrumented object, that DWARF claimed the code after it. With the observed
   objects first, the kept copy is an observed one, compiled the same way.
+- **LLVM's headers are system headers for the observed sources**
+  (`--system-header-prefix=llvm/`), so coverage skips their inline functions. Each
+  inline function was instrumented again in every observed source, which made 95% of
+  the 31k instrumented functions. Without them, profiles are 15x smaller, `llvm-cov
+  export` is about 3x faster, and the driver's JS is 286 KB instead of 24 MB.
+  (`-fprofile-list` cannot do this: its `source:` matches the translation unit, not the
+  header.)
 - **No PCH for observed sources.** Their flags differ from LLVM's shared precompiled
   headers.
 - **`LLVM_ENABLE_PIC=OFF`, `LLVM_ENABLE_PLUGINS=OFF`.**
+
+`js/src/core/llvm-tools.ts` reopens a tool's stdout on a MEMFS file: emscripten's
+terminal passes output to JavaScript byte by byte, which made `llvm-cov export` 4x slower.
 
 `js/src/core/symbolize.ts` passes llvm-symbolizer addresses relative to the code
 section: DWARF addresses in wasm are code section offsets, while V8's are file offsets.

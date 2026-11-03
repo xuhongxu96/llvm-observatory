@@ -13,7 +13,10 @@ get_filename_component(OBSERVATORY_RUNTIME "${CMAKE_CURRENT_SOURCE_DIR}/../runti
 set(HOOKS -include "${OBSERVATORY_RUNTIME}/include/llvm_observatory/hooks.h")
 # -O0 keeps every call a frame of its own: in optimized code, DWARF attributes merged
 # code to the wrong inlined frames.
-set(OBSERVE -O0 -g -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc)
+# --system-header-prefix makes LLVM's own headers system headers, which coverage skips:
+# their inline functions would otherwise be instrumented again in every observed source.
+set(OBSERVE -O0 -g -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc
+  --system-header-prefix=llvm/ --system-header-prefix=llvm-c/)
 
 # Whole libraries under observation.
 foreach(lib LLVMInstCombine LLVMAggressiveInstCombine)
