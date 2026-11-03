@@ -64,13 +64,14 @@ export function App() {
           <PanelResizeHandle className="pane-resize-handle vertical" />
           <Panel defaultSize={55} minSize={20}>
             <PanelGroup direction="vertical" autoSaveId="observatory-right">
-              <Panel defaultSize={55} minSize={15}>
+              {/* id and order: the source panel comes and goes. */}
+              <Panel id="trace" order={1} minSize={15}>
                 <TracePanel trace={result?.trace ?? null} target={observatory.target} onOpen={setSelection} />
               </Panel>
               {selection && (
                 <>
                   <PanelResizeHandle className="pane-resize-handle horizontal" />
-                  <Panel defaultSize={45} minSize={15}>
+                  <Panel id="source" order={2} defaultSize={45} minSize={15}>
                     <SourcePane
                       selection={selection}
                       target={observatory.target}

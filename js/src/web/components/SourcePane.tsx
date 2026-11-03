@@ -63,28 +63,30 @@ function SourceList({ files, onSelect }: { files: IterationCoverage | null; onSe
   if (!files) return <div className="trace-empty">decoding the iteration's coverage…</div>;
   const rows = [...files].sort(([a], [b]) => a.localeCompare(b));
   return (
-    <table className="source-list">
-      <thead>
-        <tr>
-          <th>source</th>
-          <th>decisions</th>
-          <th>branches</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map(([path, file]) => (
-          <tr key={path}>
-            <td>
-              <button type="button" className="link" onClick={() => onSelect(path)}>
-                {path}
-              </button>
-            </td>
-            <td>{file.decisions.length}</td>
-            <td>{file.branches.length}</td>
+    <div className="source-list">
+      <table>
+        <thead>
+          <tr>
+            <th>source</th>
+            <th>decisions</th>
+            <th>branches</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map(([path, file]) => (
+            <tr key={path}>
+              <td>
+                <button type="button" className="link" onClick={() => onSelect(path)}>
+                  {path}
+                </button>
+              </td>
+              <td>{file.decisions.length}</td>
+              <td>{file.branches.length}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

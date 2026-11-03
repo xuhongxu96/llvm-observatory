@@ -19,6 +19,10 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(page.locator(".source-status")).toContainText("evaluated in this iteration", { timeout: 60_000 });
   await expect(page.locator(".source-code .badge").first()).toBeVisible();
 
+  // Long source lines scroll inside the source pane; the page never gets wider.
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+
   // The iteration's overview lists the sources it evaluated conditions in.
   await page.getByRole("button", { name: "conditions" }).first().click();
   await expect(page.getByRole("button", { name: "lib/Analysis/InstructionSimplify.cpp" })).toBeVisible({ timeout: 60_000 });

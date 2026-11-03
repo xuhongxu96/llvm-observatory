@@ -65,9 +65,12 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 
+/* minmax(0, ...) and min-width: 0 keep wide content (long source lines) scrolling
+   inside its pane instead of widening the page. */
 .app {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   background: var(--bg);
 }
@@ -121,10 +124,11 @@ html, body, #root { height: 100%; margin: 0; }
 
 .panes {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
-.pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; height: 100%; overflow: hidden; }
 .pane-header {
   display: flex;
   align-items: center;
@@ -476,7 +480,8 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .badge.F { background: var(--f-bg); color: var(--f-fg); }
 .badge.M { background: var(--m-bg); color: var(--m-fg); }
 .badge.result { margin-left: 8px; }
-.source-list { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.source-list { height: 100%; overflow: auto; }
+.source-list table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .source-list th, .source-list td { text-align: left; padding: 0.25rem 0.7rem; border-bottom: 1px solid var(--border); }
 .source-list td:not(:first-child), .source-list th:not(:first-child) { text-align: right; width: 6rem; }
 .source-list button.link { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
