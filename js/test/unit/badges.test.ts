@@ -26,9 +26,22 @@ describe("sourceMarks", () => {
 });
 
 describe("splitLine", () => {
-  it("interleaves text and badges", () => {
-    const badge = { column: 3, text: "T", kind: "T" as const, title: "" };
-    expect(splitLine("abcdef", [badge])).toEqual(["abc", badge, "def"]);
-    expect(splitLine("ab", [{ ...badge, column: 9 }])).toEqual(["ab", { ...badge, column: 9 }]);
+  const badge = (column: number) => ({ column, text: "T", kind: "T" as const, title: "" });
+  const kw = (text: string) => ({ text, cls: "mtk6" });
+  const plain = (text: string) => ({ text, cls: "" });
+
+  it("places badges between spans, splitting the span they fall in", () => {
+    expect(splitLine([kw("if"), plain(" (abc)")], [badge(2), badge(6)])).toEqual([
+      kw("if"),
+      badge(2),
+      plain(" (ab"),
+      badge(6),
+      plain("c)"),
+    ]);
+  });
+
+  it("puts badges at or past the end of the line last, in order", () => {
+    expect(splitLine([plain("ab")], [badge(2), badge(9)])).toEqual([plain("ab"), badge(2), badge(9)]);
+    expect(splitLine([], [badge(0)])).toEqual([badge(0)]);
   });
 });

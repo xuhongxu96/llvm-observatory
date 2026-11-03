@@ -12,6 +12,7 @@
   --m-bg: #fff8c5; --m-fg: #7d4e00;
   --d-bg: #eaeef2; --d-fg: #57606a;
   --hit: rgba(9, 105, 218, 0.06);
+  --hl-keyword: #0000ff; --hl-type: #267f99; --hl-function: #795e26; --hl-property: #001080; --hl-string: #a31515; --hl-number: #098658; --hl-comment: #008000; --hl-operator: #3b3b3b; --hl-label: #af00db;
 }
 
 /* OS preference applies only when the user hasn't picked an explicit theme. */
@@ -28,6 +29,7 @@
     --m-bg: #4a3b10; --m-fg: #e3b341;
     --d-bg: #2a2d33; --d-fg: #a1a1a6;
     --hit: rgba(88, 166, 255, 0.08);
+    --hl-keyword: #569cd6; --hl-type: #4ec9b0; --hl-function: #dcdcaa; --hl-property: #9cdcfe; --hl-string: #ce9178; --hl-number: #b5cea8; --hl-comment: #6a9955; --hl-operator: #d4d4d4; --hl-label: #c586c0;
   }
 }
 
@@ -45,6 +47,7 @@
   --m-bg: #4a3b10; --m-fg: #e3b341;
   --d-bg: #2a2d33; --d-fg: #a1a1a6;
   --hit: rgba(88, 166, 255, 0.08);
+  --hl-keyword: #569cd6; --hl-type: #4ec9b0; --hl-function: #dcdcaa; --hl-property: #9cdcfe; --hl-string: #ce9178; --hl-number: #b5cea8; --hl-comment: #6a9955; --hl-operator: #d4d4d4; --hl-label: #c586c0;
 }
 
 :root[data-theme="light"] {
@@ -60,6 +63,7 @@
   --m-bg: #fff8c5; --m-fg: #7d4e00;
   --d-bg: #eaeef2; --d-fg: #57606a;
   --hit: rgba(9, 105, 218, 0.06);
+  --hl-keyword: #0000ff; --hl-type: #267f99; --hl-function: #795e26; --hl-property: #001080; --hl-string: #a31515; --hl-number: #098658; --hl-comment: #008000; --hl-operator: #3b3b3b; --hl-label: #af00db;
 }
 
 * { box-sizing: border-box; }
@@ -473,7 +477,8 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .source-code .row { display: grid; grid-template-columns: 56px 1fr; white-space: pre; min-width: max-content; }
 .source-code .row.hit { background: var(--hit); }
 .source-code .row.current { background: var(--accent-bg); }
-.source-code .no { color: var(--muted); text-align: right; padding: 0 10px 0 6px; user-select: none; border-right: 1px solid var(--border); }
+.source-code .no { color: var(--muted); text-align: right; padding: 0 10px 0 6px; user-select: none; border-right: 1px solid var(--border); text-decoration: none; }
+.source-code a.no:hover { color: var(--accent); text-decoration: underline; }
 .source-code .src { padding: 0 12px; }
 .badge {
   display: inline-block;
@@ -495,3 +500,14 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .source-list th, .source-list td { text-align: left; padding: 0.25rem 0.7rem; border-bottom: 1px solid var(--border); }
 .source-list td:not(:first-child), .source-list th:not(:first-child) { text-align: right; width: 6rem; }
 .source-list button.link { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* Syntax highlighting of the source view (src/web/model/highlight.ts). */
+.hl-keyword { color: var(--hl-keyword); }
+.hl-type { color: var(--hl-type); }
+.hl-function { color: var(--hl-function); }
+.hl-property { color: var(--hl-property); }
+.hl-string { color: var(--hl-string); }
+.hl-number { color: var(--hl-number); }
+.hl-comment { color: var(--hl-comment); font-style: italic; }
+.hl-operator { color: var(--hl-operator); }
+.hl-label { color: var(--hl-label); }

@@ -5,8 +5,10 @@ import { useEffect, useMemo, useRef } from "react";
 import type { FileCoverage, IterationCoverage } from "../../core/mcdc.ts";
 import type { TargetInfo } from "../../core/observatory.ts";
 import { useAsync } from "../hooks/useAsync.ts";
+import { useHighlight } from "../hooks/useHighlight.ts";
 import { useSource } from "../hooks/useSource.ts";
-import { sourceMarks, splitLine, type Badge } from "../model/badges.ts";
+import { isBadge, sourceMarks, splitLine, type Badge } from "../model/badges.ts";
+import { lineSpans } from "../model/highlight.ts";
 import { githubUrl } from "../model/github.ts";
 import { Pane } from "./Pane.tsx";
 import type { OpenSource, SourceSelection } from "./SourceLocation.tsx";
@@ -53,7 +55,7 @@ export function SourcePane({ selection, target, coverage, onOpen, onClose }: Pro
       {path === null ? (
         <SourceList files={covered} onSelect={(p) => onOpen({ iteration, path: p, line: null })} />
       ) : (
-        <SourceView path={path} line={line} file={covered?.get(path)} loading={files === undefined} />
+        <SourceView path={path} line={line} file={covered?.get(path)} loading={files === undefined} target={target} />
       )}
     </Pane>
   );
@@ -95,15 +97,17 @@ interface SourceViewProps {
   line: number | null;
   file: FileCoverage | undefined;
   loading: boolean; // the coverage is still being decoded
+  target: TargetInfo | null; // line numbers link to the line on GitHub
 }
 
-function SourceView({ path, line, file, loading }: SourceViewProps) {
+function SourceView({ path, line, file, loading, target }: SourceViewProps) {
   const source = useSource(path);
+  const highlighted = useHighlight(path, source);
   const marks = useMemo(() => (source && file ? sourceMarks(file, source) : null), [source, file]);
-  const target = useRef<HTMLDivElement>(null);
+  const currentRow = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    target.current?.scrollIntoView({ block: "center" });
+    currentRow.current?.scrollIntoView({ block: "center" });
   }, [source, line]);
 
   if (source === undefined) return <div className="trace-empty">loading {path}…</div>;
@@ -123,11 +127,25 @@ function SourceView({ path, line, file, loading }: SourceViewProps) {
           const n = i + 1;
           const badges = marks?.badges.get(n);
           return (
-            <div key={n} ref={n === line ? target : undefined} className={`row${n === line ? " current" : ""}${badges ? " hit" : ""}`}>
-              <div className="no">{n}</div>
+            <div key={n} ref={n === line ? currentRow : undefined} className={`row${n === line ? " current" : ""}${badges ? " hit" : ""}`}>
+              {target ? (
+                <a className="no" href={githubUrl(target, path, n)} target="_blank" rel="noopener noreferrer" title="open on GitHub">
+                  {n}
+                </a>
+              ) : (
+                <div className="no">{n}</div>
+              )}
               <div className="src">
-                {splitLine(text, badges).map((part, k) =>
-                  typeof part === "string" ? part : <BadgeView key={k} badge={part} />,
+                {splitLine(lineSpans(text, highlighted?.[i]), badges).map((part, k) =>
+                  isBadge(part) ? (
+                    <BadgeView key={k} badge={part} />
+                  ) : part.cls ? (
+                    <span key={k} className={part.cls}>
+                      {part.text}
+                    </span>
+                  ) : (
+                    part.text
+                  ),
                 )}
                 {text === "" && "​"}
               </div>

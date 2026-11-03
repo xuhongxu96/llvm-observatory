@@ -31,6 +31,12 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(page.locator(".source-code .row.current")).toContainText("if (Value *V = simplifyAddInst(");
   await expect(page.locator(".source-status")).toContainText("evaluated in this iteration", { timeout: 60_000 });
   await expect(page.locator(".source-code .badge").first()).toBeVisible();
+  // Highlighted as C++, with line numbers linking to the line on GitHub.
+  await expect(page.locator(".source-code .hl-function").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".source-code .row.current a.no")).toHaveAttribute(
+    "href",
+    /^https:\/\/github\.com\/llvm\/llvm-project\/blob\/[0-9a-f]{40}\/llvm\/lib\/Transforms\/InstCombine\/InstCombineAddSub\.cpp#L1592$/,
+  );
 
   // Long source lines scroll inside the source pane; the page never gets wider.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
