@@ -1,0 +1,3 @@
+# The default target LLVM: the tree that is patched, built and observed. Any commit,
+# tag or branch works; scripts/prepare_target.sh <ref> overrides this file.
+7b58716d96c3ae4c0c4e6f72e29b16137bb6224b

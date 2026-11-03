@@ -1,0 +1,4 @@
+# The infra LLVM: builds llvm-tblgen and the wasm llvm-cov, llvm-profdata and
+# llvm-symbolizer. It must be the LLVM of emcc's clang (`emcc -v`), which writes the
+# coverage profiles these tools read. The flake's emscripten uses clang 22.1.8.
+llvmorg-22.1.8

@@ -1,0 +1,30 @@
+// The host calls, as JavaScript imports. `Module.observatory` is the object the host
+// passes to the module factory.
+#include "host.h"
+
+#include <emscripten/em_js.h>
+
+EM_JS_DEPS(llvm_obs_host, "$UTF8ToString");
+
+EM_JS(void, llvm_obs_host_emit, (const char *Json, int Length), {
+  Module.observatory.emit(UTF8ToString(Json, Length));
+});
+
+EM_JS(void, llvm_obs_host_emit_profile, (int Iteration, const char *Data, int Length), {
+  Module.observatory.emitProfile(Iteration, HEAPU8.slice(Data, Data + Length));
+});
+
+namespace llvm_obs {
+namespace host {
+
+void emit(const std::string &Json) {
+  llvm_obs_host_emit(Json.data(), static_cast<int>(Json.size()));
+}
+
+void emit_profile(long Iteration, const std::vector<char> &Profile) {
+  llvm_obs_host_emit_profile(static_cast<int>(Iteration), Profile.data(),
+                             static_cast<int>(Profile.size()));
+}
+
+} // namespace host
+} // namespace llvm_obs

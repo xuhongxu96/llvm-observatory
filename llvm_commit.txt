@@ -1,3 +1,0 @@
-# LLVM ref to check out (commit SHA or tag). One ref per file.
-# Lines starting with # and blank lines are ignored.
-main

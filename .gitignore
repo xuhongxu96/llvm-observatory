@@ -1,0 +1,9 @@
+/build/
+/thirdparty/
+/.venv/
+__pycache__/
+node_modules/
+/js/dist/
+/js/test-results/
+/js/playwright-report/
+/build-*/
