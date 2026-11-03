@@ -31,8 +31,16 @@ OBSERVED_PASSES = (
 # InstCombine's main loop; InstCombinerImpl was InstCombiner before LLVM 12.
 INSTCOMBINE_RUN = ("InstCombinerImpl::run", "InstCombiner::run")
 
+# Where match(V, P) calls are delimited: every source compiled with coverage.
+MATCHING_SOURCES = (*OBSERVED_PASSES, "lib/Analysis/ValueTracking.cpp")
+
+# PatternMatch's matchers (PatternMatchHelpers.h has some since LLVM 23).
+MATCHERS = ("include/llvm/IR/PatternMatch.h", "include/llvm/Support/PatternMatchHelpers.h")
+
 RULES = (
     Rule(hooks.ValueReturns(), OBSERVED_PASSES),
+    Rule(hooks.MatchHook(), MATCHING_SOURCES),
+    Rule(hooks.MatcherHooks(), MATCHERS),
     Rule(hooks.REPLACE, ("lib/IR/Value.cpp",)),
     Rule(
         hooks.iteration("instcombine", INSTCOMBINE_RUN),

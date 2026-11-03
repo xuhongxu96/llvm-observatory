@@ -70,9 +70,20 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(source.locator(".view-lines")).toContainText("Value *llvm::simplifyAddInst(");
   await expect(visitTab).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".source-status")).toContainText("evaluated in visit 1", { timeout: 60_000 });
+  // On to the implementation, whose match call ran in the visit: its hover shows the
+  // matchers as they ran.
+  await source.locator(".view-line span", { hasText: /^simplifyAddInst$/ }).last().click({ modifiers: ["ControlOrMeta"] });
+  await expect(crumb).toHaveAttribute("title", /^lib\/Analysis\/InstructionSimplify\.cpp:5\d\d$/);
+  await source.locator(".view-line", { hasText: "X + poison -> poison" }).click();
+  await page.keyboard.press("PageDown"); // down to the call, at line 608
+  const call = source.locator(".source-annotation").first();
+  await expect(call).toHaveText("match");
+  await call.hover();
+  await expect(page.locator(".monaco-hover:not(.hidden)")).toContainText("is_zero  i32 0  ✓");
+  await page.getByRole("button", { name: "back" }).click();
   await page.getByRole("button", { name: "back" }).click();
   await expect(crumb).toHaveText("InstCombineAddSub.cpp:1592");
-  await expect(page.locator(".breadcrumb .ahead")).toHaveText("simplifyAddInst");
+  await expect(page.locator(".breadcrumb .ahead")).toHaveText(["simplifyAddInst", "simplifyAddInst"]);
   // The whole run's conditions, kept along further jumps.
   await page.getByRole("tab", { name: "whole run" }).click();
   await expect(page.locator(".source-status")).toContainText("evaluated in the run", { timeout: 60_000 });
@@ -97,7 +108,8 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   expect(saved.iterations[0].pass).toBe("instcombine");
   await page.getByRole("tab", { name: "structured" }).click();
 
-  // From a visit's conditions to the whole iteration's.
+  // From a visit's conditions to the whole iteration's, back at the rule.
+  await page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first().click();
   await page.getByRole("tab", { name: "iteration 1" }).click();
   await expect(page.locator(".source-status")).toContainText("evaluated in iteration 1", { timeout: 60_000 });
 

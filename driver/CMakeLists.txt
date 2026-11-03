@@ -4,7 +4,8 @@
 #
 # External projects are configured after llvm/lib, so this file can also set the flags
 # of the observed LLVM sources without editing LLVM's own CMake files:
-#   - the hooks header is force-included into every patched source;
+#   - the hooks header is force-included into every patched source (the matchers' hooks
+#     header goes into every source: scripts/build_driver.sh);
 #   - the observed sources get DWARF (stack traces) and MC/DC coverage. Their flags
 #     differ from the rest of LLVM, so they cannot use LLVM's shared precompiled headers.
 cmake_minimum_required(VERSION 3.20)
@@ -29,7 +30,7 @@ foreach(lib LLVMInstCombine LLVMAggressiveInstCombine)
   endif()
 endforeach()
 
-# Single files of larger libraries. ValueTracking has no hooks, only coverage: its
+# Single files of larger libraries. ValueTracking has only match calls among the hooks: its
 # conditions often decide whether a fold applies.
 function(observe_sources dir)
   cmake_parse_arguments(ARG "" "" "HOOKS;OBSERVE" ${ARGN})
@@ -52,7 +53,7 @@ function(observe_sources dir)
 endfunction()
 
 observe_sources(lib/Analysis
-  HOOKS InstructionSimplify.cpp ConstantFolding.cpp
+  HOOKS InstructionSimplify.cpp ConstantFolding.cpp ValueTracking.cpp
   OBSERVE InstructionSimplify.cpp ConstantFolding.cpp ValueTracking.cpp)
 observe_sources(lib/IR HOOKS Value.cpp)
 

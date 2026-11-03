@@ -22,12 +22,33 @@ public:
     NeedComma = true;
     return *this;
   }
+  // Opens an array, the value of `Key`; its elements are objects (open() without a key).
+  Json &array(const char *Key) {
+    prefix(Key);
+    Out += '[';
+    NeedComma = false;
+    return *this;
+  }
+  Json &close_array() {
+    Out += ']';
+    NeedComma = true;
+    return *this;
+  }
   Json &field(const char *Key, const std::string &Value) {
     prefix(Key);
     quote(Value);
     NeedComma = true;
     return *this;
   }
+  // (Without this, a string literal would take the bool overload.)
+  Json &field(const char *Key, const char *Value) { return field(Key, std::string(Value)); }
+  Json &field(const char *Key, bool Value) {
+    prefix(Key);
+    Out += Value ? "true" : "false";
+    NeedComma = true;
+    return *this;
+  }
+  Json &field(const char *Key, int Value) { return field(Key, static_cast<long>(Value)); }
   Json &field(const char *Key, long Value) {
     prefix(Key);
     Out += std::to_string(Value);

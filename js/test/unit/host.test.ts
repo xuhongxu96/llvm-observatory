@@ -21,9 +21,11 @@ describe("parseWasmStack", () => {
 describe("Recorder", () => {
   it("records events with their stacks and profiles by iteration", () => {
     const recorder = new Recorder();
-    recorder.observatory.emit('{"type":"iteration_begin","iteration":1,"pass":"instcombine"}');
+    recorder.observatory.emit('{"type":"iteration_begin","iteration":1,"pass":"instcombine"}', true);
+    recorder.observatory.emit('{"type":"iteration_end","iteration":1}', false);
     recorder.observatory.emitProfile(1, new Uint8Array([1, 2]));
-    expect(recorder.events).toHaveLength(1);
+    expect(recorder.events).toHaveLength(2);
+    expect(recorder.events[1].stack).toEqual([]); // not asked for
     expect(recorder.events[0].data).toEqual({ type: "iteration_begin", iteration: 1, pass: "instcombine" });
     expect(recorder.profiles.get(1)).toEqual(new Uint8Array([1, 2]));
     recorder.clear();

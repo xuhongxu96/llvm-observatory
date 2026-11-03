@@ -1,12 +1,14 @@
-// The interface between a patched LLVM tree and the observatory runtime. The patcher
-// (patcher/hooks.py) inserts calls to these hooks, and the driver build force-includes
-// this header into the patched sources. It stays C++11: LLVM 8 and 9 build as C++11.
+// The interface between the patched observed sources (and Value.cpp) and the
+// observatory runtime. The patcher (patcher/hooks.py) inserts calls to these hooks, and
+// driver/CMakeLists.txt force-includes this header into those sources. The matchers'
+// hooks are in matchers.h. It stays C++11: LLVM 8 and 9 build as C++11.
 #ifndef LLVM_OBSERVATORY_HOOKS_H
 #define LLVM_OBSERVATORY_HOOKS_H
 
 // Not under observation itself: no coverage for the hooks.
 #pragma clang system_header
 
+#include <cstddef>
 #include <type_traits>
 #include <utility>
 
@@ -42,6 +44,15 @@ public:
   VisitScope(const VisitScope &) = delete;
   VisitScope &operator=(const VisitScope &) = delete;
 };
+
+// One call of PatternMatch's match(V, Pattern) from an observed source:
+// `match(V, P)` becomes `(match_begin(), match_end(match(V, P)))`. (A temporary scope
+// object would live to the end of the full expression, past the other match calls of a
+// condition.) Its matchers report to it (MatcherScope, in matchers.h). The defaults
+// record where it is: the column is that of match_begin, which the patcher puts just
+// before `match`. A match call inside another one is part of the outer one.
+void match_begin(const char *File = __builtin_FILE(), int Line = __builtin_LINE(), int Column = __builtin_COLUMN());
+bool match_end(bool Matched);
 
 template <typename T>
 using IsValue = std::is_convertible<T &&, const llvm::Value *>;

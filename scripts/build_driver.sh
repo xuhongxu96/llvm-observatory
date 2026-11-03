@@ -16,6 +16,8 @@ build_tblgen "$TARGET" "$HOST"
 tblgen=(-DLLVM_TABLEGEN="$HOST/bin/llvm-tblgen")
 [ -x "$HOST/bin/llvm-min-tblgen" ] && tblgen+=(-DLLVM_MIN_TABLEGEN="$HOST/bin/llvm-min-tblgen")
 
+# The matchers' hooks header goes into every C++ source: the patched PatternMatch.h is included all
+# over LLVM.
 emcmake cmake -G Ninja -S "$TARGET/llvm" -B "$WASM" "${CCACHE[@]}" "${CMAKE_COMPAT[@]}" "${tblgen[@]}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_TARGETS_TO_BUILD= \
@@ -27,6 +29,7 @@ emcmake cmake -G Ninja -S "$TARGET/llvm" -B "$WASM" "${CCACHE[@]}" "${CMAKE_COMP
   -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF \
   -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_LIBEDIT=OFF -DLLVM_ENABLE_ONDISK_CAS=OFF \
   -DLLVM_NATIVE_TOOL_DIR="$HOST/bin" \
+  -DCMAKE_CXX_FLAGS="-include $ROOT/runtime/include/llvm_observatory/matchers.h" \
   -DLLVM_EXTERNAL_PROJECTS=observatory_driver \
   -DLLVM_EXTERNAL_OBSERVATORY_DRIVER_SOURCE_DIR="$ROOT/driver"
 ninja -C "$WASM" -j "$JOBS" observatory_driver

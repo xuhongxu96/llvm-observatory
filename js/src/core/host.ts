@@ -1,9 +1,10 @@
 // The JavaScript side of runtime/src/host.cpp. The driver module calls
 // `observatory.emit` for every event, while the event's wasm frames are live, so the
-// stack is captured here; and `observatory.emitProfile` with each coverage segment.
+// stack is captured here when the event asks for it; and `observatory.emitProfile` with
+// each coverage segment.
 
 import { ProfileStore } from "./profiles.ts";
-import type { ValueInfo } from "./types.ts";
+import type { MatcherRun, ValueInfo } from "./types.ts";
 
 // A wasm frame of a captured stack: its byte offset in the module, which is the
 // address llvm-symbolizer takes, and the name V8 shows (from the name section).
@@ -25,7 +26,8 @@ export type RawEventData =
   | { type: "visit_end"; iteration: number; visit: number }
   | { type: "value"; iteration: number; visit?: number; value: ValueInfo }
   | { type: "replace"; iteration: number; visit?: number; old: ValueInfo; new: ValueInfo }
-  | { type: "segment"; iteration: number; visit?: number; segment: number };
+  | { type: "segment"; iteration: number; visit?: number; segment: number }
+  | { type: "match"; iteration: number; visit?: number; file: string; line: number; column: number; matchers: MatcherRun[] };
 
 export class Recorder {
   events: RawEvent[] = [];
@@ -33,8 +35,8 @@ export class Recorder {
 
   // Passed to the module factory as `observatory`.
   readonly observatory = {
-    emit: (json: string) => {
-      this.events.push({ data: JSON.parse(json) as RawEventData, stack: parseWasmStack(new Error().stack ?? "") });
+    emit: (json: string, stack: boolean) => {
+      this.events.push({ data: JSON.parse(json) as RawEventData, stack: stack ? parseWasmStack(new Error().stack ?? "") : [] });
     },
     emitProfile: (segment: number, profile: Uint8Array) => {
       this.profiles.add(segment, profile);

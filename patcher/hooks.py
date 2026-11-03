@@ -125,3 +125,76 @@ class VisitScopeHook:
     @cached_property
     def _calls(self) -> Query:
         return query(queries.calls_to("visit"))
+
+
+MATCH_BEGIN = b"(llvm_obs::match_begin(), llvm_obs::match_end("
+
+
+@dataclass(frozen=True)
+class MatchHook:
+    """`match(V, P)` -> `(llvm_obs::match_begin(), llvm_obs::match_end(match(V, P)))`:
+    delimits each call of PatternMatch's match, whose matchers MatcherHooks record."""
+
+    name: str = "match"
+
+    def points(self, src: SourceFile) -> list[Point]:
+        return [
+            (Insertion(m["call"][0].start_byte, MATCH_BEGIN), Insertion(m["call"][0].end_byte, b"))"))
+            for m in src.matches(queries.MATCH_CALLS)
+        ]
+
+
+@dataclass(frozen=True)
+class MatcherHooks:
+    """In each matcher's `match` method (a `match` defined in a class body):
+    - `llvm_obs::MatcherScope llvm_obs_matcher("<class>", __LINE__, <value>);` first, the
+      value being the method's first pointer parameter (or nullptr);
+    - `return X;` -> `return llvm_obs_matcher.result(X);`;
+    - an assignment to one of the class's members, `M = X` or `*M = X`, ->
+      `M = llvm_obs_matcher.bound("M", X)`: what the matcher binds.
+    Returns and assignments of nested lambdas are left alone."""
+
+    name: str = "matchers"
+
+    def points(self, src: SourceFile) -> list[Point]:
+        classes = [(m["name"][0], m["body"][0]) for m in src.matches(queries.CLASS_BODIES)]
+        points: list[Point] = []
+        for method in src.matches(queries.MATCH_METHODS):
+            node = method["method"][0]
+            owner = _innermost(node, classes)
+            if owner is None:
+                continue  # a free function
+            name, body = owner
+            members = {src.text(m).decode() for m in src.captures(queries.MEMBERS, body).get("member", [])}
+            points.append(self._scope(src, method, src.text(name).decode()))
+            points += self._results(src, method["body"][0])
+            points += self._bindings(src, method["body"][0], members)
+        return points
+
+    def _scope(self, src: SourceFile, method: dict[str, list[Node]], class_name: str) -> Point:
+        pointers = src.captures(queries.POINTER_PARAMETERS, method["params"][0]).get("parameter", [])
+        value = src.text(min(pointers, key=lambda n: n.start_byte)).decode() if pointers else "nullptr"
+        statement = f' llvm_obs::MatcherScope llvm_obs_matcher("{class_name}", __LINE__, {value});'
+        return (Insertion(method["open"][0].end_byte, statement.encode()),)
+
+    def _results(self, src: SourceFile, body: Node) -> list[Point]:
+        return [
+            (Insertion(v.start_byte, b"llvm_obs_matcher.result("), Insertion(v.end_byte, b")"))
+            for v in _own_returns(src, body)
+        ]
+
+    def _bindings(self, src: SourceFile, body: Node, members: set[str]) -> list[Point]:
+        nested = src.captures(queries.NESTED_SCOPES, body).get("scope", [])
+        points: list[Point] = []
+        for m in src.matches(queries.ASSIGNMENTS, body):
+            target, value = src.text(m["target"][0]).decode(), m["value"][0]
+            if target in members and not any(_within(value, scope) for scope in nested):
+                opening = f'llvm_obs_matcher.bound("{target}", '.encode()
+                points.append((Insertion(value.start_byte, opening), Insertion(value.end_byte, b")")))
+        return points
+
+
+def _innermost(node: Node, classes: list[tuple[Node, Node]]) -> tuple[Node, Node] | None:
+    """The innermost (name, body) of `classes` whose body contains `node`."""
+    owners = [(name, body) for name, body in classes if _within(node, body)]
+    return min(owners, key=lambda c: c[1].end_byte - c[1].start_byte, default=None)

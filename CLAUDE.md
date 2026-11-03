@@ -6,8 +6,10 @@ layout and its commands; read it first.
 ## Invariants
 
 - **Patching keeps line numbers.** Every `Insertion` is newline-free (asserted in
-  `patcher/source.py`), and the hooks header is force-included by
-  `driver/CMakeLists.txt` (`-include`), not `#include`d. Stack frames, MC/DC regions and
+  `patcher/source.py`), and the hooks headers are force-included (`-include`), not
+  `#include`d: `hooks.h` into the observed sources and `Value.cpp` by
+  `driver/CMakeLists.txt`, `matchers.h` into every C++ source by
+  `scripts/build_driver.sh` (the patched PatternMatch.h is included all over LLVM). Stack frames, MC/DC regions and
   GitHub links rely on upstream line numbers.
 - **The patcher uses tree-sitter queries** (`patcher/queries.py`) with predicates for
   all node selection. Do not walk fields or filter nodes in loops when a query can
@@ -23,8 +25,12 @@ layout and its commands; read it first.
   whole and the others as byte differences from it (`js/src/core/profiles.ts`).
 - **No LLVM CMake file is patched.** `driver/CMakeLists.txt` is an LLVM external
   project, configured after `llvm/lib`. It sets the observed sources' flags and the link.
-- **Targets are LLVM 8 and later.** Code for older releases is not kept. `hooks.h` stays
-  C++11-compatible (LLVM 8 and 9 build as C++11).
+- **Targets are LLVM 8 and later.** Code for older releases is not kept. The hooks headers
+  stay C++11-compatible (LLVM 8 and 9 build as C++11).
+- **`matchers.h` declares no LLVM name.** A forward-declared `llvm::Value` makes `Value`
+  ambiguous in sources that also use `llvm::json::Value` (TextAPI). It recognizes
+  LLVM's types by their members (`stripPointerCasts`, `getActiveBits`,
+  `bitcastToAPInt`) when a matcher is instantiated, and passes them type-erased.
 - **The tools match emcc, not the target.** `llvm-cov`/`llvm-profdata`/`llvm-symbolizer`
   are built from the infra tree (`infra_commit.txt`, emcc's LLVM) and read profiles of
   any target.
@@ -49,7 +55,7 @@ was found the hard way:
   observed source: 95% of the 31k instrumented functions. With only PatternMatch kept
   (about 10k functions), an iteration decodes in about 0.8 s instead of 5 s.
   `-fprofile-list` cannot do this: its `source:` matches the translation unit, not the
-  header. `hooks.h` is `#pragma clang system_header` for the same reason.
+  header. The hooks headers are `#pragma clang system_header` for the same reason.
   `js/src/core/mcdc.ts` merges the records a header function has per instantiation.
 - **No PCH for observed sources.** Their flags differ from LLVM's shared precompiled
   headers.

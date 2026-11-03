@@ -1,7 +1,8 @@
 // Builds the trace model from a driver run and the symbols of its stacks.
 import type { RawEvent, StackAddress } from "./host.ts";
 import type { Symbols } from "./symbolize.ts";
-import type { Frame, Iteration, Trace } from "./types.ts";
+import { sourcePath } from "./symbolize.ts";
+import type { Frame, Iteration, Site, Trace } from "./types.ts";
 
 // The observatory's own frames (runtime and hooks) say nothing about the fold.
 const isObservatoryFrame = (f: Frame) => shortName(f.function).startsWith("llvm_obs::");
@@ -18,7 +19,7 @@ export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
   for (const { data, stack } of events) {
     switch (data.type) {
       case "iteration_begin":
-        current = { number: data.iteration, pass: data.pass, visits: [], values: [], replacements: [], irAfter: "" };
+        current = { number: data.iteration, pass: data.pass, visits: [], matches: [], values: [], replacements: [], irAfter: "" };
         iterations.push(current);
         break;
       case "iteration_end":
@@ -28,6 +29,11 @@ export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
       case "visit_begin":
         current?.visits.push({ number: data.visit, instruction: data.instruction });
         break;
+      case "match": {
+        const site = siteOf(data);
+        if (site) current?.matches.push({ ...visitOf(data), site, matchers: data.matchers });
+        break;
+      }
       case "value":
         current?.values.push({ value: data.value, ...visitOf(data), ...observed(stack, symbols) });
         break;
@@ -40,6 +46,15 @@ export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
 }
 
 const visitOf = (data: { visit?: number }) => (data.visit ? { visit: data.visit } : {});
+
+// match_begin (runtime/include/llvm_observatory/hooks.h) records the column of its own
+// call, which the patcher puts this far before `match`.
+const MATCH_PREFIX = "llvm_obs::match_begin(), llvm_obs::match_end(".length;
+
+function siteOf(data: { file: string; line: number; column: number }): Site | null {
+  const path = sourcePath(data.file);
+  return path ? { path, line: data.line, column: data.column + MATCH_PREFIX } : null;
+}
 
 // The coverage segments of a run, by iteration and visit (null: between visits).
 export interface Segment {

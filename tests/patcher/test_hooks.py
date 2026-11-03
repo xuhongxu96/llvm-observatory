@@ -113,6 +113,58 @@ def test_visit_scope_wraps_the_visit_call():
     assert out.count("VisitScope") == 1  # not member calls, nor other functions
 
 
+def test_match_hook_wraps_pattern_match_calls():
+    out = patch(hooks.MatchHook(), """
+        Value *f(Value *Op0, Value *Op1) {
+          if (match(Op1, m_Zero()) && PatternMatch::match(Op0, m_One()))
+            return Op0;
+          return P.match(Op0) || match(Op0) ? Op1 : nullptr;
+        }
+        """)
+    begin = "llvm_obs::match_begin(), llvm_obs::match_end("
+    assert f"if (({begin}match(Op1, m_Zero()))) && ({begin}PatternMatch::match(Op0, m_One()))))" in out
+    assert "return P.match(Op0) || match(Op0) ?" in out  # a matcher's own match, and one argument
+
+
+MATCHERS = """
+template <typename Class> struct bind_ty {
+  Class *&VR;
+  bind_ty(Class *&V) : VR(V) {}
+  template <typename ITy> bool match(ITy *V) const {
+    if (auto *CV = dyn_cast<Class>(V)) {
+      VR = CV;
+      return true;
+    }
+    auto Local = V;
+    Local = nullptr;
+    return false;
+  }
+};
+struct shuffle_ty {
+  ArrayRef<int> &MaskRef;
+  bool match(ArrayRef<int> Mask) { MaskRef = Mask; return [&] { return true; }(); }
+};
+template <typename Val, typename Pattern> bool match(Val *V, const Pattern &P) { return P.match(V); }
+"""
+
+
+def test_matcher_hooks_record_runs_results_and_bindings():
+    out = patch(hooks.MatcherHooks(), MATCHERS)
+    assert 'bool match(ITy *V) const { llvm_obs::MatcherScope llvm_obs_matcher("bind_ty", __LINE__, V);' in out
+    assert 'VR = llvm_obs_matcher.bound("VR", CV);' in out
+    assert "return llvm_obs_matcher.result(true);" in out
+    assert "return llvm_obs_matcher.result(false);" in out
+    assert "Local = nullptr;" in out  # not a member
+
+
+def test_matcher_hooks_without_a_value_and_with_a_lambda():
+    out = patch(hooks.MatcherHooks(), MATCHERS)
+    assert 'bool match(ArrayRef<int> Mask) { llvm_obs::MatcherScope llvm_obs_matcher("shuffle_ty", __LINE__, nullptr);' in out
+    assert 'MaskRef = llvm_obs_matcher.bound("MaskRef", Mask);' in out
+    assert "return llvm_obs_matcher.result([&] { return true; }());" in out  # the lambda's own return stays
+    assert "bool match(Val *V, const Pattern &P) { return P.match(V); }" in out  # a free function
+
+
 def test_no_match_gives_no_points():
     hook = hooks.iteration("instcombine", ("InstCombinerImpl::run",))
     src = SourceFile(Path("t.cpp"), b"void InstCombinePass::run() {}")

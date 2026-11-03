@@ -55,3 +55,54 @@ def calls_to(callee: str) -> str:
   arguments: (argument_list . (_) @argument .)
   (#eq? @callee "{callee}")) @call
 """
+
+
+# Calls of PatternMatch's match(V, Pattern): `match(...)` or `PatternMatch::match(...)`
+# with two arguments (not the matchers' own `P.match(V)`).
+MATCH_CALLS = query("""
+(call_expression
+  function: [(identifier) @callee
+             (qualified_identifier name: (identifier) @callee)]
+  arguments: (argument_list . (_) . (_) .)
+  (#eq? @callee "match")) @call
+""")
+
+# Classes and structs with a body.
+CLASS_BODIES = query("""
+[(struct_specifier name: (type_identifier) @name body: (field_declaration_list) @body)
+ (class_specifier name: (type_identifier) @name body: (field_declaration_list) @body)]
+""")
+
+# The members a class declares, references and pointers included.
+MEMBERS = query("""
+(field_declaration
+  declarator: [(field_identifier) @member
+               (reference_declarator (field_identifier) @member)
+               (pointer_declarator declarator: (field_identifier) @member)
+               (pointer_declarator declarator: (reference_declarator (field_identifier) @member))
+               (pointer_declarator declarator: (pointer_declarator declarator: (field_identifier) @member))])
+""")
+
+# Functions named `match` (a matcher's method when in a class body; tree-sitter names a
+# templated method with an identifier, a plain one with a field_identifier).
+MATCH_METHODS = query("""
+(function_definition
+  declarator: (function_declarator
+    declarator: [(field_identifier) (identifier)] @name
+    parameters: (parameter_list) @params)
+  body: (compound_statement "{" @open) @body
+  (#eq? @name "match")) @method
+""")
+
+# Pointer parameters, by name.
+POINTER_PARAMETERS = query("""
+(parameter_declaration declarator: (pointer_declarator declarator: (identifier) @parameter))
+""")
+
+# Plain assignments to a name or through a pointer name: `X = ...`, `*X = ...`.
+ASSIGNMENTS = query("""
+(assignment_expression
+  left: [(identifier) @target (pointer_expression argument: (identifier) @target)]
+  operator: "="
+  right: (_) @value)
+""")

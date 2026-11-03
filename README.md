@@ -6,6 +6,9 @@ and AggressiveInstCombine it shows
 - each value a fold produced, and each replacement (RAUW) it made, with the full call
   stack down to the source line of the fold, and the rule (the InstCombine function)
   that fired;
+- each `match(V, P)` call an observed source made, with every matcher of its pattern as
+  it ran: whether it matched, the value it looked at, and what it bound (an IR value,
+  an `APInt`, a predicate, ...);
 - every condition the iteration evaluated in InstCombine, InstructionSimplify,
   ConstantFolding and ValueTracking, from Clang's MC/DC coverage: `T`/`F` for each
   operand of `&&`/`||` and the outcome of each decision, so you can see why a fold did
@@ -16,7 +19,7 @@ commit.
 
 ## How it works
 
-The patch to LLVM is small. `patcher/` (Python, tree-sitter queries) inserts three hooks,
+The patch to LLVM is small. `patcher/` (Python, tree-sitter queries) inserts its hooks,
 each on an existing line, so that line numbers do not change:
 
 | hook | where | inserted |
@@ -25,12 +28,17 @@ each on an existing line, so that line numbers do not change:
 | replace | `Value::doRAUW` | `llvm_obs::on_replace(this, New);` |
 | iteration | `InstCombinerImpl::run`, `AggressiveInstCombinePass::run` | `llvm_obs::IterationScope …;` |
 | visit | `visit(*I)` in `InstCombinerImpl::run` | `(llvm_obs::VisitScope(*I), visit(*I))` |
+| match | `match(V, P)` in the observed sources | `(llvm_obs::match_begin(), llvm_obs::match_end(match(V, P)))` |
+| matchers | the `match` methods of PatternMatch's matchers | a `MatcherScope` first; `result(X)` around returns; `bound("M", X)` around member assignments |
 
 Everything else comes from the toolchain:
 
 - **Stacks.** Each hook calls into JavaScript (`runtime/src/host.cpp`), which reads the
   live wasm stack from `new Error().stack`. `llvm-symbolizer` resolves it with the DWARF
   of the observed sources.
+- **Matchers.** A match call collects the runs of its matchers as a tree (a matcher's
+  sub-patterns run inside it) and emits it as one event, without a stack. The source
+  panel underlines each call that ran in the scope; its hover shows the tree.
 - **Conditions.** The observed sources are compiled with `-fcoverage-mcdc`. The runtime
   hands the raw profile to JavaScript per segment and resets the counters: a segment is
   one visit of an instruction by InstCombine, or the iteration's code before, between

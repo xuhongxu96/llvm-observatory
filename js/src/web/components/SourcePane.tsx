@@ -1,18 +1,20 @@
 // The source panel: observed sources with the MC/DC values of a scope (a visit, an
 // iteration, or the whole run), a badge after each condition (T, F, – not evaluated, T/F
-// both) and after each decision (its outcome). Jumps to definitions (Ctrl/⌘+click or F12
-// on a call) keep the scope and add to a breadcrumb; back and the crumbs return. Without
-// a path, it lists the sources that evaluated conditions.
+// both) and after each decision (its outcome). Each match(V, P) call that ran is
+// underlined: its hover shows its pattern's matchers, as they ran. Jumps to definitions
+// (Ctrl/⌘+click or F12 on a call) keep the scope and add to a breadcrumb; back and the
+// crumbs return. Without a path, it lists the sources that evaluated conditions.
 import { useEffect, useMemo, useState } from "react";
 import type { FileCoverage, IterationCoverage } from "../../core/mcdc.ts";
 import { describeScope, type CoverageScope, type TargetInfo } from "../../core/observatory.ts";
 import { lookup, type TagsFile } from "../../core/tags.ts";
-import type { Visit } from "../../core/types.ts";
+import type { MatchCall, Visit } from "../../core/types.ts";
 import { useAsync } from "../hooks/useAsync.ts";
 import { useDistJson } from "../hooks/useDistJson.ts";
 import { useSource } from "../hooks/useSource.ts";
 import { sourceMarks } from "../model/badges.ts";
 import { githubUrl } from "../model/github.ts";
+import { callHover, callSites } from "../model/matchCalls.ts";
 import {
   current,
   goTo,
@@ -27,7 +29,10 @@ import {
   type Navigation,
 } from "../model/navigation.ts";
 import { Pane } from "./Pane.tsx";
-import { SourceEditor } from "./SourceEditor.tsx";
+import { SourceEditor, type Annotation } from "./SourceEditor.tsx";
+
+// A match(V, P) call of the run, with its iteration.
+export type RunMatchCall = MatchCall & { iteration: number };
 
 interface Props {
   nav: Navigation;
@@ -35,15 +40,22 @@ interface Props {
   target: TargetInfo | null;
   coverage(scope: CoverageScope): Promise<IterationCoverage>;
   visit(number: number): Visit | undefined; // of the current run
+  matches: RunMatchCall[]; // of the current run
   onClose(): void;
 }
 
-export function SourcePane({ nav, onNavigate, target, coverage, visit, onClose }: Props) {
+export function SourcePane({ nav, onNavigate, target, coverage, visit, matches, onClose }: Props) {
   const scope = scopeOf(nav);
   const { path, line } = current(nav);
   const files = useAsync(() => coverage(scope), [coverage, scope.iteration, scope.visit]);
   const covered = files && "value" in files ? files.value : null;
   const tags = useDistJson<TagsFile>("tags.json");
+  // The match calls that ran where the navigation started (its iteration and visit).
+  const { iteration, visit: visitNumber } = nav.context;
+  const calls = useMemo(
+    () => matches.filter((m) => (iteration === undefined || m.iteration === iteration) && (visitNumber === undefined || m.visit === visitNumber)),
+    [matches, iteration, visitNumber],
+  );
   const [notice, setNotice] = useState("");
   useEffect(() => setNotice(""), [nav]);
 
@@ -87,6 +99,8 @@ export function SourcePane({ nav, onNavigate, target, coverage, visit, onClose }
           line={line}
           scope={scope}
           file={covered?.files.get(path)}
+          calls={calls}
+          callsWhere={describeScope({ iteration, visit: visitNumber })}
           loading={files === undefined}
           target={target}
           notice={notice}
@@ -196,6 +210,8 @@ interface SourceViewProps {
   line: number | null;
   scope: CoverageScope;
   file: FileCoverage | undefined;
+  calls: MatchCall[]; // the match calls that ran where the navigation started
+  callsWhere: string; // where that is
   loading: boolean; // the coverage is still being decoded
   target: TargetInfo | null; // line numbers link to the line on GitHub
   notice: string;
@@ -205,9 +221,19 @@ interface SourceViewProps {
 }
 
 function SourceView(props: SourceViewProps) {
-  const { path, line, scope, file, loading, target, notice, alternatives, onAlternative, onFollow } = props;
+  const { path, line, scope, file, calls, callsWhere, loading, target, notice, alternatives, onAlternative, onFollow } = props;
   const source = useSource(path);
   const marks = useMemo(() => (source && file ? sourceMarks(file, source) : null), [source, file]);
+  const annotations = useMemo<Annotation[]>(
+    () =>
+      callSites(calls, path).map((site) => ({
+        line: site.site.line,
+        column: site.site.column,
+        length: "match".length,
+        hover: callHover(site, callsWhere),
+      })),
+    [calls, path, callsWhere],
+  );
 
   if (source === undefined) return <div className="trace-empty">loading {path}…</div>;
   if (source === null) return <div className="trace-empty">{path} is not in this build's sources</div>;
@@ -237,6 +263,7 @@ function SourceView(props: SourceViewProps) {
         path={path}
         source={source}
         marks={marks}
+        annotations={annotations}
         line={line}
         target={target}
         onFollow={onFollow}

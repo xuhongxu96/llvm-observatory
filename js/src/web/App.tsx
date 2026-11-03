@@ -31,6 +31,7 @@ export function App() {
   }, []);
   const { status, result } = observatory;
   const visits = useMemo(() => new Map(result?.trace.iterations.flatMap((it) => it.visits.map((v) => [v.number, v]))), [result]);
+  const matches = useMemo(() => result?.trace.iterations.flatMap((it) => it.matches.map((m) => ({ ...m, iteration: it.number }))) ?? [], [result]);
 
   const canRun = !shared.decoding && (status.kind === "ready" || status.kind === "done" || status.kind === "runError");
   const run = useCallback(() => {
@@ -83,6 +84,7 @@ export function App() {
                         target={observatory.target}
                         coverage={observatory.coverage}
                         visit={(n) => visits.get(n)}
+                        matches={matches}
                         onClose={() => setNav(null)}
                       />
                     </ErrorBoundary>

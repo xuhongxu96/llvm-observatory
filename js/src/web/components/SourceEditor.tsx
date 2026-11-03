@@ -1,8 +1,8 @@
 // An observed source in a read-only editor: C++ highlighting (src/web/monaco/cpp.ts), the
 // MC/DC badges of the iteration after their conditions (hover one for its test vectors),
-// the current line and the lines that evaluated conditions marked, line numbers that
-// open the line on GitHub, and Ctrl/⌘+click or F12 on a name to follow it (to its
-// definition).
+// annotations (underlined, with a hover; e.g. a match call's matchers), the current line
+// and the lines that evaluated conditions marked, line numbers that open the line on
+// GitHub, and Ctrl/⌘+click or F12 on a name to follow it (to its definition).
 import MonacoEditor, { type OnMount } from "@monaco-editor/react";
 import type * as monacoApi from "monaco-editor";
 import { useEffect, useRef, useState } from "react";
@@ -17,16 +17,25 @@ import { setupMonaco } from "../monaco/setup.ts";
 type Editor = monacoApi.editor.IStandaloneCodeEditor;
 type Monaco = typeof monacoApi;
 
+// A span of a line with a hover (markdown).
+export interface Annotation {
+  line: number;
+  column: number; // 1-based
+  length: number;
+  hover: string;
+}
+
 interface Props {
   path: string;
   source: string;
   marks: SourceMarks | null;
+  annotations: Annotation[];
   line: number | null; // the current line, revealed
   target: TargetInfo | null;
   onFollow(name: string, args: number | null): void; // args: of the call, null if not a call
 }
 
-export function SourceEditor({ path, source, marks, line, target, onFollow }: Props) {
+export function SourceEditor({ path, source, marks, annotations, line, target, onFollow }: Props) {
   const theme = useMonacoTheme();
   const [mounted, setMounted] = useState<{ editor: Editor; monaco: Monaco } | null>(null);
   const decorations = useRef<monacoApi.editor.IEditorDecorationsCollection | null>(null);
@@ -70,8 +79,11 @@ export function SourceEditor({ path, source, marks, line, target, onFollow }: Pr
 
   useEffect(() => {
     if (!mounted) return;
-    decorations.current?.set(sourceDecorations(mounted.monaco, marks, line));
-  }, [mounted, marks, line, source]);
+    decorations.current?.set([
+      ...sourceDecorations(mounted.monaco, marks, line),
+      ...annotations.map((a) => annotationDecoration(mounted.monaco, a)),
+    ]);
+  }, [mounted, marks, annotations, line, source]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -158,4 +170,11 @@ function underlineOnModifier(editor: Editor, monaco: Monaco) {
     );
   });
   editor.onMouseLeave(() => underline.clear());
+}
+
+function annotationDecoration(monaco: Monaco, a: Annotation): monacoApi.editor.IModelDeltaDecoration {
+  return {
+    range: new monaco.Range(a.line, a.column, a.line, a.column + a.length),
+    options: { inlineClassName: "source-annotation", hoverMessage: { value: a.hover } },
+  };
 }

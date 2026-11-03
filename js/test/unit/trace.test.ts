@@ -74,22 +74,29 @@ describe("shortName", () => {
   });
 });
 
-describe("visits and segments", () => {
+describe("visits, match calls and segments", () => {
   const instruction = { ptr: "0x20", ir: "%a = add i32 %x, 0" };
+  const run = { name: "is_zero", line: 600, value: "i32 0", result: true, bound: [], matchers: [] };
   const raw: RawEvent[] = [
     { data: { type: "iteration_begin", iteration: 1, pass: "instcombine" }, stack: [] },
     { data: { type: "segment", iteration: 1, segment: 1 }, stack: [] },
     { data: { type: "visit_begin", iteration: 1, visit: 1, instruction }, stack: [] },
     { data: { type: "value", iteration: 1, visit: 1, value }, stack: [] },
+    {
+      data: { type: "match", iteration: 1, visit: 1, file: "/t/llvm/lib/Analysis/InstructionSimplify.cpp", line: 608, column: 8, matchers: [run] },
+      stack: [],
+    },
     { data: { type: "segment", iteration: 1, visit: 1, segment: 2 }, stack: [] },
     { data: { type: "visit_end", iteration: 1, visit: 1 }, stack: [] },
     { data: { type: "segment", iteration: 1, segment: 3 }, stack: [] },
     { data: { type: "iteration_end", iteration: 1 }, stack: [] },
   ];
 
-  it("records each visit and the visit of each record", () => {
+  it("records each visit, each match call, and the visit of each record", () => {
     const [it1] = buildTrace(raw, new Map()).iterations;
     expect(it1.visits).toEqual([{ number: 1, instruction }]);
+    const column = 8 + "llvm_obs::match_begin(), llvm_obs::match_end(".length; // at `match`
+    expect(it1.matches).toEqual([{ visit: 1, site: { path: "lib/Analysis/InstructionSimplify.cpp", line: 608, column }, matchers: [run] }]);
     expect(it1.values[0].visit).toBe(1);
   });
 

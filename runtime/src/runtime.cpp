@@ -6,6 +6,12 @@
 //   replace         {iteration, visit?, old: Description, new: Description}
 //   segment         {iteration, visit?, segment}, followed by the segment's coverage profile
 //   visit_end       {iteration, visit}
+//   match           {iteration, visit?, file, line, column, matchers: [Matcher]}: a call
+//                   of PatternMatch's match(V, P), reported when it returns
+//
+// Matcher: {name, line, value?, result?, bound: [{name, value}], matchers: [Matcher]}, one
+// run of a matcher's match method: the value it examined, whether it matched, what it
+// bound, and the matchers it ran.
 //   iteration_end   {iteration, ir: the module after the iteration}
 //
 // Description: {ptr, ir, opcode?, fn?, bb?, debug_loc?} (empty fields are omitted).
@@ -17,6 +23,7 @@
 // before, between and after visits. The counters are reset at the start of each, so an
 // iteration's coverage is the merge of its segments.
 #include "llvm_observatory/hooks.h"
+#include "llvm_observatory/matchers.h"
 #include "llvm_observatory/session.h"
 
 #include "host.h"
@@ -28,6 +35,9 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -44,12 +54,34 @@ extern "C" int __llvm_profile_write_buffer(char *Buffer);
 namespace llvm_obs {
 namespace {
 
+// The matchers of one match(V, P) call, as a tree.
+struct MatcherRun {
+  std::string Name;
+  int Line;
+  std::string Value; // empty if none
+  int Result = -1;   // -1: did not return (e.g. through an exception)
+  std::vector<std::pair<std::string, std::string>> Bound;
+  std::vector<int> Children;
+};
+
+struct MatchCall {
+  std::string File;
+  int Line = 0;
+  int Column = 0;
+  std::vector<MatcherRun> Runs;
+  std::vector<int> Roots;
+  std::vector<int> Open; // the matchers running, innermost last
+};
+
 struct State {
   const llvm::Module *Module = nullptr; // the module under observation
   long Iteration = 0;                 // 1-based number of the current or last iteration
   long Visit = 0;                     // the current visit; 0 = between visits
   long Visits = 0;                    // visits so far
   long Segments = 0;                  // coverage segments so far
+  bool InCall = false;                // inside a recorded match(V, P) call
+  int Calls = 0;                      // nesting of match calls
+  MatchCall Call;                     // the outermost one
   int Depth = 0;                      // nesting of IterationScope; 0 = not observing
   std::set<const llvm::Value *> Seen; // values already reported in this iteration
 };
@@ -126,6 +158,35 @@ std::vector<char> profile() {
   return Buffer;
 }
 
+std::string operand(const llvm::Value &V) {
+  return printed([&](llvm::raw_ostream &OS) { V.printAsOperand(OS, true); });
+}
+
+void describe_runs(Json &J, const MatchCall &Call, const std::vector<int> &Runs) {
+  J.array("matchers");
+  for (int I : Runs) {
+    const MatcherRun &R = Call.Runs[I];
+    J.open().field("name", R.Name).field("line", R.Line);
+    if (!R.Value.empty())
+      J.field("value", R.Value);
+    if (R.Result >= 0)
+      J.field("result", R.Result == 1);
+    J.array("bound");
+    for (const auto &B : R.Bound)
+      J.open().field("name", B.first).field("value", B.second).close();
+    J.close_array();
+    describe_runs(J, Call, R.Children);
+    J.close();
+  }
+  J.close_array();
+}
+
+void add_binding(int Node, const char *Name, std::string Text) {
+  State &S = state();
+  if (S.InCall && Node < static_cast<int>(S.Call.Runs.size()))
+    S.Call.Runs[Node].Bound.emplace_back(Name, std::move(Text));
+}
+
 // Reports the coverage since the last reset as a segment, and starts the next one.
 void end_segment() {
   State &S = state();
@@ -200,6 +261,73 @@ VisitScope::~VisitScope() {
   host::emit(event("visit_end").close().str());
   S.Visit = 0;
 }
+
+void match_begin(const char *File, int Line, int Column) {
+  State &S = state();
+  if (S.Calls++ > 0 || S.Depth == 0)
+    return;
+  S.InCall = true;
+  S.Call = MatchCall();
+  S.Call.File = File;
+  S.Call.Line = Line;
+  S.Call.Column = Column;
+}
+
+bool match_end(bool Matched) {
+  State &S = state();
+  if (--S.Calls > 0 || !S.InCall)
+    return Matched;
+  Json J = event("match");
+  J.field("file", S.Call.File).field("line", S.Call.Line).field("column", S.Call.Column);
+  describe_runs(J, S.Call, S.Call.Roots);
+  host::emit(J.close().str(), /*Stack=*/false);
+  S.InCall = false;
+  return Matched;
+}
+
+MatcherScope::MatcherScope(const char *Name, int Line, const void *Operand, int) {
+  const auto *V = static_cast<const llvm::Value *>(Operand);
+  State &S = state();
+  if (!S.InCall)
+    return;
+  MatchCall &Call = S.Call;
+  Node = static_cast<int>(Call.Runs.size());
+  Call.Runs.push_back(MatcherRun{Name, Line, V ? operand(*V) : std::string(), -1, {}, {}});
+  (Call.Open.empty() ? Call.Roots : Call.Runs[Call.Open.back()].Children).push_back(Node);
+  Call.Open.push_back(Node);
+}
+
+MatcherScope::~MatcherScope() {
+  State &S = state();
+  if (Node >= 0 && S.InCall && !S.Call.Open.empty())
+    S.Call.Open.pop_back();
+}
+
+bool MatcherScope::result(bool Matched) {
+  State &S = state();
+  if (Node >= 0 && S.InCall)
+    S.Call.Runs[Node].Result = Matched;
+  return Matched;
+}
+
+namespace detail {
+void note_value(int Node, const char *Name, const void *Value) {
+  const auto *V = static_cast<const llvm::Value *>(Value);
+  add_binding(Node, Name, V ? operand(*V) : "null");
+}
+void note_apint(int Node, const char *Name, const void *Value) {
+  const auto *V = static_cast<const llvm::APInt *>(Value);
+  add_binding(Node, Name, V ? printed([&](llvm::raw_ostream &OS) { V->print(OS, /*isSigned=*/true); }) : "null");
+}
+void note_apfloat(int Node, const char *Name, const void *Value) {
+  const auto *V = static_cast<const llvm::APFloat *>(Value);
+  llvm::SmallString<32> Text;
+  if (V)
+    V->toString(Text);
+  add_binding(Node, Name, V ? std::string(Text.str()) : "null");
+}
+void note_integer(int Node, const char *Name, long long V) { add_binding(Node, Name, std::to_string(V)); }
+} // namespace detail
 
 } // namespace llvm_obs
 

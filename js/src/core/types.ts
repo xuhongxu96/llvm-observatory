@@ -41,10 +41,38 @@ export interface Visit {
   instruction: ValueInfo; // as it was when the visit began
 }
 
+// Where a call of PatternMatch's match(V, P) is: its source, line and the column of
+// `match` (in the sources as compiled).
+export interface Site {
+  path: string;
+  line: number;
+  column: number;
+}
+
+// One run of a matcher's match method: the value it examined, whether it matched, what
+// it bound (a member it assigned: the IR value, constant or number), and the matchers
+// it ran in turn.
+export interface MatcherRun {
+  name: string; // the matcher's class, e.g. BinaryOp_match
+  line: number; // of its match method, in PatternMatch.h
+  value?: string;
+  result?: boolean;
+  bound: { name: string; value: string }[];
+  matchers: MatcherRun[];
+}
+
+// One call of PatternMatch's match(V, P) from an observed source.
+export interface MatchCall {
+  visit?: number;
+  site: Site;
+  matchers: MatcherRun[]; // the pattern's top matcher, as run
+}
+
 export interface Iteration {
   number: number;      // 1-based, over the whole run
   pass: string;        // "instcombine" | "aggressive-instcombine"
   visits: Visit[];
+  matches: MatchCall[];
   values: ValueRecord[];
   replacements: Replacement[];
   irAfter: string;     // the whole module after this iteration

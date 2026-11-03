@@ -7,11 +7,12 @@ import pytest
 from patcher.patch import patch_tree
 
 FILES = {
+    "llvm/include/llvm/IR/PatternMatch.h": "struct is_zero {\n  template <typename ITy> bool match(ITy *V) { return false; }\n};\n",
     "llvm/CMakeLists.txt": "set(LLVM_VERSION_MAJOR 23)\n",
     "llvm/lib/IR/Value.cpp": "void Value::doRAUW(Value *New, int M) {\n}\n",
     "llvm/lib/Transforms/InstCombine/InstructionCombining.cpp": (
         "bool InstCombinerImpl::run() {\n  if (Instruction *R = visit(*I))\n    return true;\n  return false;\n}\n"
-        "Value *InstCombinerImpl::simplify(Value *V) {\n  return V;\n}\n"
+        "Value *InstCombinerImpl::simplify(Value *V) {\n  if (match(V, m_Zero()))\n    return nullptr;\n  return V;\n}\n"
     ),
 }
 
@@ -32,6 +33,8 @@ def test_patches_every_rule(tree: Path):
         "replace": 1,
         "iteration:instcombine": 1,
         "visit": 1,
+        "match": 1,
+        "matchers": 2,  # the scope and the result
         "iteration:aggressive-instcombine": 0,
     }
     combining = (tree / "llvm/lib/Transforms/InstCombine/InstructionCombining.cpp").read_text()

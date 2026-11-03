@@ -6,6 +6,8 @@
 //   ; expect mcdc <path>: term, term      a condition evaluated in <path> (under llvm/)
 //   ; expect visit-mcdc `<ir>` <path>: term, term
 //                                         ... in the visit that produced the value <ir>
+//   ; expect match <path>: term, term     a match call in <path>, by its matcher tree
+//                                         (matchers, ✓/✗, values and bindings)
 //   ; requires LLVM >= <major>            skip the file for older targets
 //
 // A record matches when every term occurs in it, ignoring case (LLVM renamed functions
@@ -18,6 +20,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { DEFAULT_DIST, localDist } from "../../src/cli/dist.ts";
 import { decisions, singleConditions } from "../../src/core/mcdc.ts";
+import { treeLines } from "../../src/web/model/matchCalls.ts";
 import { Observatory, type CoverageScope, type Run } from "../../src/core/observatory.ts";
 import type { Frame, Replacement, ValueRecord } from "../../src/core/types.ts";
 
@@ -26,13 +29,13 @@ const dist = localDist(process.env.OBSERVATORY_DIST ?? DEFAULT_DIST);
 const observatory = await Observatory.create(dist);
 
 interface Expectation {
-  kind: "value" | "replace" | "mcdc" | "visit-mcdc";
+  kind: "value" | "replace" | "mcdc" | "visit-mcdc" | "match";
   subject: string;
   path?: string; // visit-mcdc
   terms: string[];
 }
 
-const EXPECT = /^;\s*expect (value|replace|mcdc) (?:`([^`]*)`|(\S+)):\s*(.*)$/;
+const EXPECT = /^;\s*expect (value|replace|mcdc|match) (?:`([^`]*)`|(\S+)):\s*(.*)$/;
 const EXPECT_VISIT = /^;\s*expect visit-mcdc `([^`]*)` (\S+):\s*(.*)$/;
 const REQUIRES = /^;\s*requires LLVM >= (\d+)\s*$/m;
 const targetMajor = Number((await dist.target()).version.split(".")[0]);
@@ -63,6 +66,7 @@ for (const name of readdirSync(INPUTS).filter((f) => f.endsWith(".ll")).sort()) 
       await t.test(`${e.kind} ${e.subject}`, async () => {
         if (e.kind === "mcdc") await expectCondition(run, e);
         else if (e.kind === "visit-mcdc") await expectVisitCondition(run, e);
+        else if (e.kind === "match") expectMatch(run, e);
         else await expectRecord(run, e);
       });
     }
@@ -119,5 +123,15 @@ async function expectConditionIn(run: Run, scopes: CoverageScope[], path: string
   assert.ok(
     texts.some((text) => terms.every((term) => text.includes(term))),
     `no condition in ${path} with ${JSON.stringify(terms)} (${texts.length} evaluated)`,
+  );
+}
+
+function expectMatch(run: Run, e: Expectation) {
+  const calls = run.trace.iterations.flatMap((it) => it.matches).filter((m) => m.site.path === e.subject);
+  assert.ok(calls.length > 0, `no match call in ${e.subject}`);
+  const texts = calls.map((call) => treeLines(call.matchers, "").join("\n"));
+  assert.ok(
+    texts.some((text) => e.terms.every((term) => text.includes(term))),
+    `no match call in ${e.subject} with ${JSON.stringify(e.terms)} (${calls.length} ran); the first:\n${texts[0]}`,
   );
 }

@@ -18,3 +18,4 @@ entry:
 ; expect mcdc lib/Analysis/InstructionSimplify.cpp: m_Zero
 ; expect mcdc include/llvm/IR/PatternMatch.h: hasOneUse
 ; expect visit-mcdc `i32 %x` lib/Analysis/InstructionSimplify.cpp: m_Zero
+; expect match lib/Analysis/InstructionSimplify.cpp: i32 0  ✓

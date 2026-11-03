@@ -474,6 +474,7 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .source-editor.linked .margin .line-numbers { cursor: pointer; }
 .source-editor.linked .margin .line-numbers:hover { color: var(--accent); text-decoration: underline; }
 .source-line-hit { background: var(--hit); }
+.source-annotation { text-decoration: underline dotted var(--accent); text-underline-offset: 3px; cursor: help; }
 .source-followable { text-decoration: underline; color: var(--accent) !important; cursor: pointer; }
 .source-line-current { background: var(--accent-bg); }
 .badge {
