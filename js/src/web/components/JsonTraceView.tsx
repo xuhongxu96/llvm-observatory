@@ -1,15 +1,15 @@
-// The trace as text (src/core/text.ts), in a read-only editor.
+// The trace as formatted JSON (the trace object of `observe.ts --json`), in a read-only
+// editor: folding, search and selection come with it.
 import MonacoEditor from "@monaco-editor/react";
 import { useMonacoTheme } from "../hooks/useColorScheme.ts";
 import { setupMonaco } from "../monaco/setup.ts";
-import { TRACE } from "../monaco/traceLanguage.ts";
 
-export function TextTraceView({ text, wordWrap }: { text: string; wordWrap: boolean }) {
+export function JsonTraceView({ json, wordWrap }: { json: string; wordWrap: boolean }) {
   const theme = useMonacoTheme();
   return (
     <MonacoEditor
-      value={text || "— press Run to observe InstCombine —"}
-      language={TRACE}
+      value={json || "// press Run to observe InstCombine"}
+      language="json"
       beforeMount={setupMonaco}
       theme={theme}
       options={{
@@ -19,7 +19,7 @@ export function TextTraceView({ text, wordWrap }: { text: string; wordWrap: bool
         fontSize: 13,
         scrollBeyondLastLine: false,
         wordWrap: wordWrap ? "on" : "off",
-        contextmenu: false,
+        folding: true,
       }}
     />
   );

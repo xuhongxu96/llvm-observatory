@@ -1,32 +1,33 @@
-// The trace pane: structured or text view.
+// The trace pane: the structured view, or the trace as JSON.
 import { useMemo, useState } from "react";
 import type { TargetInfo } from "../../core/observatory.ts";
-import { renderText } from "../../core/text.ts";
 import type { Trace } from "../../core/types.ts";
+import { JsonTraceView } from "./JsonTraceView.tsx";
 import { CopyButton, Pane } from "./Pane.tsx";
 import type { OpenSource } from "./SourceLocation.tsx";
 import { StructuredTraceView } from "./StructuredTraceView.tsx";
-import { TextTraceView } from "./TextTraceView.tsx";
 
-type Mode = "structured" | "text";
-
-const TEXT_FRAMES = 8;
+const MODES = ["structured", "json"] as const;
+type Mode = (typeof MODES)[number];
 
 export function TracePanel({ trace, target, onOpen }: { trace: Trace | null; target: TargetInfo | null; onOpen: OpenSource }) {
   const [mode, setMode] = useState<Mode>("structured");
-  const [wordWrap, setWordWrap] = useState(true);
-  const text = useMemo(() => (trace ? renderText(trace, { maxFrames: TEXT_FRAMES }) : ""), [trace]);
+  const [wordWrap, setWordWrap] = useState(false);
+  const json = useMemo(() => (trace ? JSON.stringify(trace, null, 2) : ""), [trace]);
 
   const actions = (
     <>
-      {mode === "text" && <CopyButton text={text} />}
-      {mode === "text" && (
-        <button type="button" className="pane-header-button" onClick={() => setWordWrap((w) => !w)}>
-          wrap: {wordWrap ? "on" : "off"}
-        </button>
+      {mode === "json" && (
+        <>
+          <CopyButton text={json} />
+          <DownloadButton text={json} name="trace.json" />
+          <button type="button" className="pane-header-button" onClick={() => setWordWrap((w) => !w)}>
+            wrap: {wordWrap ? "on" : "off"}
+          </button>
+        </>
       )}
       <div className="view-mode-toggle" role="tablist" aria-label="view mode">
-        {(["structured", "text"] as const).map((m) => (
+        {MODES.map((m) => (
           <button
             key={m}
             type="button"
@@ -47,8 +48,22 @@ export function TracePanel({ trace, target, onOpen }: { trace: Trace | null; tar
       {mode === "structured" ? (
         <StructuredTraceView iterations={trace?.iterations ?? []} target={target} onOpen={onOpen} />
       ) : (
-        <TextTraceView text={text} wordWrap={wordWrap} />
+        <JsonTraceView json={json} wordWrap={wordWrap} />
       )}
     </Pane>
+  );
+}
+
+function DownloadButton({ text, name }: { text: string; name: string }) {
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const link = Object.assign(document.createElement("a"), { href: url, download: name });
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <button type="button" className="pane-header-button" onClick={download} disabled={!text} title={`Save as ${name}`}>
+      download
+    </button>
   );
 }

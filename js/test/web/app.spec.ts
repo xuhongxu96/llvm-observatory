@@ -67,6 +67,16 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await page.locator(".trace-frames").first().getByRole("button", { name: /^Instruction\.def:/ }).click();
   await expect(page.getByText("include/llvm/IR/Instruction.def is not in this build's sources")).toBeVisible();
 
+  // The trace as JSON: shown formatted, and saved as a file.
+  await page.getByRole("tab", { name: "json" }).click();
+  const jsonPane = page.locator(".pane", { hasText: "Trace" });
+  await expect(jsonPane.locator(".view-lines")).toContainText('"iterations": [');
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "download" }).click()]);
+  expect(download.suggestedFilename()).toBe("trace.json");
+  const saved = JSON.parse(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString()));
+  expect(saved.iterations[0].pass).toBe("instcombine");
+  await page.getByRole("tab", { name: "structured" }).click();
+
   // The iteration's overview lists the sources it evaluated conditions in.
   await page.getByRole("button", { name: "conditions" }).first().click();
   await expect(page.getByRole("button", { name: "lib/Analysis/InstructionSimplify.cpp" })).toBeVisible({ timeout: 60_000 });
