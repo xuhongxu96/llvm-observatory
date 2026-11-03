@@ -79,7 +79,7 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   const call = source.locator(".source-annotation").first();
   await expect(call).toHaveText("match");
   await call.hover();
-  await expect(page.locator(".monaco-hover:not(.hidden)")).toContainText("is_zero  i32 0  ✓");
+  await expect(page.locator(".monaco-hover:not(.hidden)")).toContainText("m_Zero()  i32 0  ✓");
   await page.getByRole("button", { name: "back" }).click();
   await page.getByRole("button", { name: "back" }).click();
   await expect(crumb).toHaveText("InstCombineAddSub.cpp:1592");

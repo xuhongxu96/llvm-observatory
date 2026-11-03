@@ -31,6 +31,12 @@
             python3
             nodejs_26
           ];
+
+          # uv's environment runs on this Python: scripts/xref.py loads emcc's libclang,
+          # which needs the glibc of nixpkgs.
+          shellHook = ''
+            export UV_PYTHON=${pkgs.python3}/bin/python3
+          '';
         };
       });
     };

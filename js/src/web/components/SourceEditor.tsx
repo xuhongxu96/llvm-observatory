@@ -17,6 +17,14 @@ import { setupMonaco } from "../monaco/setup.ts";
 type Editor = monacoApi.editor.IStandaloneCodeEditor;
 type Monaco = typeof monacoApi;
 
+// A name to follow to its definition.
+export interface Followed {
+  name: string;
+  line: number;
+  column: number; // 1-based, of its first character
+  args: number | null; // of the call, null if not a call
+}
+
 // A span of a line with a hover (markdown).
 export interface Annotation {
   line: number;
@@ -32,7 +40,7 @@ interface Props {
   annotations: Annotation[];
   line: number | null; // the current line, revealed
   target: TargetInfo | null;
-  onFollow(name: string, args: number | null): void; // args: of the call, null if not a call
+  onFollow(name: Followed): void;
 }
 
 export function SourceEditor({ path, source, marks, annotations, line, target, onFollow }: Props) {
@@ -154,7 +162,7 @@ function followAt(editor: monacoApi.editor.ICodeEditor, position: monacoApi.IPos
   const word = model?.getWordAtPosition(position);
   if (!model || !word) return;
   const end = model.getOffsetAt({ lineNumber: position.lineNumber, column: word.endColumn });
-  onFollow(word.word, callArguments(model.getValue(), end));
+  onFollow({ name: word.word, line: position.lineNumber, column: word.startColumn, args: callArguments(model.getValue(), end) });
 }
 
 // Underlines the word under the mouse while Ctrl/⌘ is held: it can be followed.

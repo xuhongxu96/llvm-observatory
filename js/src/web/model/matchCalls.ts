@@ -1,6 +1,8 @@
 // The match(V, P) calls of a source in the source view, and their hovers: for each run,
 // the tree of its pattern's matchers, with the value each examined, whether it matched
-// (✓, ✗), and what it bound.
+// (✓, ✗), and what it bound. The matchers are named as the pattern writes them
+// (m_Add(…), m_Value(X)) where it is known (scripts/xref.py), by their class otherwise.
+import type { Pattern } from "../../core/xref.ts";
 import type { MatchCall, MatcherRun, Site } from "../../core/types.ts";
 
 export interface CallSite {
@@ -21,16 +23,71 @@ export function callSites(calls: MatchCall[], path: string): CallSite[] {
   return [...sites.values()];
 }
 
+// A matcher run, named.
+export interface NamedRun {
+  label: string; // m_Add(…), m_Value(X), or the class (BinaryOp_match)
+  value?: string;
+  result?: boolean;
+  bound: { name: string; value: string }[];
+  matchers: NamedRun[];
+}
+
+// Names the runs after `pattern`. A run takes the sub-pattern (of its parent's) whose
+// matcher has its class, the next one in order when several do (a commutative matcher
+// tries its operands twice, a combinator its alternatives). A run that takes none is
+// the inner working of its parent's matcher: it keeps its class, and its own runs look
+// for the parent's sub-patterns.
+export function nameRuns(runs: MatcherRun[], pattern: Pattern | null): NamedRun[] {
+  return named(runs, pattern ? [pattern] : []);
+}
+
+function named(runs: MatcherRun[], candidates: Pattern[]): NamedRun[] {
+  let next = 0;
+  return runs.map((outer) => {
+    const order = candidates.map((_, i) => (next + i) % candidates.length);
+    const taken = order.find((i) => candidates[i].classes.includes(outer.name));
+    const pattern = taken === undefined ? null : candidates[taken];
+    if (taken !== undefined) next = (taken + 1) % candidates.length;
+    const run = unwrap(outer, pattern?.classes ?? [outer.name]);
+    return {
+      label: pattern ? labelOf(pattern) : run.name,
+      value: run.value,
+      result: run.result,
+      bound: pattern ? boundAs(run.bound, pattern.vars) : run.bound,
+      matchers: named(run.matchers, pattern ? pattern.args : candidates),
+    };
+  });
+}
+
+// A match method that only forwards to another of the same matcher, on the same value
+// (BinaryOp_match's match(V) to match(Opcode, V); SpecificBinaryOp_match's to its base
+// BinaryOp_match's), is one run: the inner one, with the outer's result. `classes`: the
+// matcher's class and bases.
+function unwrap(run: MatcherRun, classes: string[]): MatcherRun {
+  const [inner] = run.matchers;
+  if (run.matchers.length !== 1 || !classes.includes(inner.name) || inner.value !== run.value) return run;
+  return unwrap({ ...inner, result: run.result, bound: [...run.bound, ...inner.bound] }, classes);
+}
+
+// A leaf as written; a pattern with sub-patterns by its name (they follow, below it).
+const labelOf = (p: Pattern) => (p.args.length > 0 ? `${p.name}(…)` : p.text);
+
+// What a matcher bound, under the names of the variables it binds (m_APInt(C): C, not
+// its member Res), when they pair up.
+function boundAs(bound: NamedRun["bound"], vars: string[]): NamedRun["bound"] {
+  return bound.length === vars.length ? bound.map((b, i) => ({ ...b, name: vars[i] })) : bound;
+}
+
 const SHOWN_RUNS = 8;
 
 // Markdown: each run's matcher tree, under its outcome.
-export function callHover({ runs }: CallSite, where: string): string {
+export function callHover({ runs }: CallSite, where: string, pattern: Pattern | null): string {
   const times = runs.length === 1 ? "once" : `${runs.length} times`;
   const parts = [`**match** ran ${times} in ${where}`];
   runs.slice(0, SHOWN_RUNS).forEach((run, i) => {
     const outcome = outcomeOf(run.matchers);
     const title = runs.length === 1 ? "" : `run ${i + 1}: `;
-    parts.push(`${title}${outcome}\n\`\`\`\n${treeLines(run.matchers, "").join("\n")}\n\`\`\``);
+    parts.push(`${title}${outcome}\n\`\`\`\n${treeLines(nameRuns(run.matchers, pattern)).join("\n")}\n\`\`\``);
   });
   if (runs.length > SHOWN_RUNS) parts.push(`… ${runs.length - SHOWN_RUNS} more`);
   return parts.join("\n\n");
@@ -43,14 +100,15 @@ function outcomeOf(matchers: MatcherRun[]): string {
 
 const mark = (result: boolean | undefined) => (result === undefined ? "?" : result ? "✓" : "✗");
 
-// One line per matcher run, children indented under their parent.
-export function treeLines(matchers: MatcherRun[], indent: string): string[] {
-  return matchers.flatMap((m, i) => {
-    const last = i === matchers.length - 1;
-    const branch = indent === "" && matchers.length === 1 ? "" : last ? "└ " : "├ ";
+// One line per matcher run, children indented under their parent. A single top run
+// has no branch.
+export function treeLines(runs: NamedRun[], indent = "", top = true): string[] {
+  return runs.flatMap((m, i) => {
+    const last = i === runs.length - 1;
+    const branch = top && runs.length === 1 ? "" : last ? "└ " : "├ ";
     const bound = m.bound.map((b) => `  ${b.name} = ${b.value}`).join("");
-    const line = `${indent}${branch}${m.name}${m.value ? `  ${m.value}` : ""}  ${mark(m.result)}${bound}`;
+    const line = `${indent}${branch}${m.label}${m.value ? `  ${m.value}` : ""}  ${mark(m.result)}${bound}`;
     const childIndent = indent + (branch === "" ? "" : last ? "  " : "│ ");
-    return [line, ...treeLines(m.matchers, childIndent)];
+    return [line, ...treeLines(m.matchers, childIndent, false)];
   });
 }

@@ -3,6 +3,8 @@
 #   driver/    observatory_driver.{js,wasm}
 #   sources/   the observed sources as compiled (patched), by path under llvm/
 #   tags.json  the sources' functions and types (scripts/tags.py)
+#   xref.json  what each call in the sources calls, and the patterns of match calls
+#              (scripts/xref.py)
 #   target.json  {ref, commit, version}
 # Run scripts/prepare_target.sh first.
 source "$(dirname "$0")/lib.sh"
@@ -29,6 +31,7 @@ emcmake cmake -G Ninja -S "$TARGET/llvm" -B "$WASM" "${CCACHE[@]}" "${CMAKE_COMP
   -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF \
   -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_LIBEDIT=OFF -DLLVM_ENABLE_ONDISK_CAS=OFF \
   -DLLVM_NATIVE_TOOL_DIR="$HOST/bin" \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DCMAKE_CXX_FLAGS="-include $ROOT/runtime/include/llvm_observatory/matchers.h" \
   -DLLVM_EXTERNAL_PROJECTS=observatory_driver \
   -DLLVM_EXTERNAL_OBSERVATORY_DRIVER_SOURCE_DIR="$ROOT/driver"
@@ -55,6 +58,8 @@ cd "$ROOT"
 
 # The functions defined and declared in the sources (jump to definition).
 uv run python scripts/tags.py "$DIST/sources" "$DIST/tags.json"
+# What each call calls, as clang resolves it (overloads), from the build's compile commands.
+uv run python scripts/xref.py "$WASM/compile_commands.json" "$TARGET/llvm" "$DIST/sources" "$DIST/xref.json"
 
 cat > "$DIST/target.json" <<JSON
 {"ref": "$(cat "$TARGET/.observatory-ref")", "commit": "$(git -C "$TARGET" rev-parse HEAD)", "version": "$(llvm_version "$TARGET")"}

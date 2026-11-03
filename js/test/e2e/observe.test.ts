@@ -7,7 +7,8 @@
 //   ; expect visit-mcdc `<ir>` <path>: term, term
 //                                         ... in the visit that produced the value <ir>
 //   ; expect match <path>: term, term     a match call in <path>, by its matcher tree
-//                                         (matchers, ✓/✗, values and bindings)
+//                                         (matchers named as written, ✓/✗, values and
+//                                         bindings)
 //   ; requires LLVM >= <major>            skip the file for older targets
 //
 // A record matches when every term occurs in it, ignoring case (LLVM renamed functions
@@ -17,15 +18,19 @@
 //   node --test test/e2e/observe.test.ts [--dist DIR via OBSERVATORY_DIST]
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { DEFAULT_DIST, localDist } from "../../src/cli/dist.ts";
 import { decisions, singleConditions } from "../../src/core/mcdc.ts";
-import { treeLines } from "../../src/web/model/matchCalls.ts";
+import { patternAt, type XrefFile } from "../../src/core/xref.ts";
+import { nameRuns, treeLines } from "../../src/web/model/matchCalls.ts";
 import { Observatory, type CoverageScope, type Run } from "../../src/core/observatory.ts";
 import type { Frame, Replacement, ValueRecord } from "../../src/core/types.ts";
 
 const INPUTS = new URL("./inputs/", import.meta.url);
-const dist = localDist(process.env.OBSERVATORY_DIST ?? DEFAULT_DIST);
+const distDir = process.env.OBSERVATORY_DIST ?? DEFAULT_DIST;
+const dist = localDist(distDir);
+const xref = JSON.parse(readFileSync(join(distDir, "xref.json"), "utf8")) as XrefFile;
 const observatory = await Observatory.create(dist);
 
 interface Expectation {
@@ -129,7 +134,7 @@ async function expectConditionIn(run: Run, scopes: CoverageScope[], path: string
 function expectMatch(run: Run, e: Expectation) {
   const calls = run.trace.iterations.flatMap((it) => it.matches).filter((m) => m.site.path === e.subject);
   assert.ok(calls.length > 0, `no match call in ${e.subject}`);
-  const texts = calls.map((call) => treeLines(call.matchers, "").join("\n"));
+  const texts = calls.map((call) => treeLines(nameRuns(call.matchers, patternAt(xref, call.site))).join("\n"));
   assert.ok(
     texts.some((text) => e.terms.every((term) => text.includes(term))),
     `no match call in ${e.subject} with ${JSON.stringify(e.terms)} (${calls.length} ran); the first:\n${texts[0]}`,

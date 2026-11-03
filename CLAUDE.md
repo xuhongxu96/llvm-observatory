@@ -61,10 +61,19 @@ was found the hard way:
   headers.
 - **`LLVM_ENABLE_PIC=OFF`, `LLVM_ENABLE_PLUGINS=OFF`.**
 
-`scripts/tags.py` indexes the shipped sources' functions with tree-sitter's C++ tags
-query, with a definition flag and parameter counts: jump to definition picks the
-overloads that take the call's argument count (e.g. the free `match(V, P)` among the
-matchers' `match(V)` methods). tree-sitter is pinned below 0.26: 0.26.0 segfaults in
+`scripts/xref.py` resolves the calls in the shipped sources with libclang: emcc's own
+`libclang.so` (same version as the compiler), the `clang` Python bindings, and the
+build's `compile_commands.json` plus `em++ --cflags`. Jump to definition goes where
+clang resolved the call; overloads of the same arity differ only by type. libclang needs
+the glibc of nixpkgs, so the flake points uv at its Python (`UV_PYTHON`). The match
+calls' patterns are recorded with each matcher's class and bases;
+`js/src/web/model/matchCalls.ts` names the runs after them (a run of the parent's own
+class on the same value is folded into it: forwarding `match` methods).
+
+`scripts/tags.py` is the fallback for names clang did not resolve (in templates):
+the shipped sources' functions by tree-sitter's C++ tags query, with a definition flag
+and parameter counts, so jump to definition picks the overloads that take the call's
+argument count (e.g. the free `match(V, P)` among the matchers' `match(V)` methods). tree-sitter is pinned below 0.26: 0.26.0 segfaults in
 `QueryCursor.matches` on this run.
 
 `js/src/core/llvm-tools.ts` reopens a tool's stdout on a MEMFS file: emscripten's

@@ -19,4 +19,4 @@ define i32 @popcount32(i32 %x) {
 }
 
 ; expect replace `%res = lshr i32 %mul, 24`: tryToRecognizePopCount, foldUnusualPatterns, AggressiveInstCombine.cpp
-; expect match lib/Analysis/InstructionSimplify.cpp: i32 1  ✓  Res = 1
+; expect match lib/Analysis/InstructionSimplify.cpp: m_APInt(, i32 1  ✓, = 1

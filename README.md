@@ -38,7 +38,12 @@ Everything else comes from the toolchain:
   of the observed sources.
 - **Matchers.** A match call collects the runs of its matchers as a tree (a matcher's
   sub-patterns run inside it) and emits it as one event, without a stack. The source
-  panel underlines each call that ran in the scope; its hover shows the tree.
+  panel underlines each call that ran in the scope; its hover shows the tree, with the
+  matchers named as the pattern writes them (`m_Add(…)`, `m_Value(X)`).
+- **Cross-references.** After the build, `scripts/xref.py` has clang (libclang, from
+  emcc's LLVM) parse the observed sources with the build's compile commands. It
+  records what each call calls (so jump to definition picks the right overload) and the
+  pattern of each match call (the matcher types line up the runs with it).
 - **Conditions.** The observed sources are compiled with `-fcoverage-mcdc`. The runtime
   hands the raw profile to JavaScript per segment and resets the counters: a segment is
   one visit of an instruction by InstCombine, or the iteration's code before, between
@@ -70,8 +75,8 @@ patcher/         the patcher (uv run python -m patcher --llvm <tree> [--dry-run]
 runtime/         the hooks' interface (include/) and their implementation (src/)
 driver/          the observed program and its build flags
 scripts/         prepare_infra.sh, build_tools.sh, prepare_target.sh, build_driver.sh;
-                 tags.py (the sources' functions, for jump to definition), run by
-                 build_driver.sh
+                 tags.py (the sources' functions, by name) and xref.py (calls and
+                 patterns, by clang), run by build_driver.sh
 js/src/core/     driver, host, symbolizer, trace model, MC/DC decoding (shared)
 js/src/cli/      observe.ts: the Node command line
 js/src/web/      the web app (Vite + React)
@@ -90,7 +95,7 @@ uv sync                            # the patcher's Python packages
 scripts/prepare_infra.sh           # infra LLVM; warns if it is not emcc's LLVM
 scripts/build_tools.sh             # build/dist/llvm-tools/
 scripts/prepare_target.sh [ref]    # target LLVM at ref, patched
-scripts/build_driver.sh            # build/dist/{driver,sources,target.json}
+scripts/build_driver.sh            # build/dist/{driver,sources,tags.json,xref.json,target.json}
 cd js && npm install
 ```
 

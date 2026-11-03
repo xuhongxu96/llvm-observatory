@@ -2,12 +2,14 @@
 // iteration, or the whole run), a badge after each condition (T, F, – not evaluated, T/F
 // both) and after each decision (its outcome). Each match(V, P) call that ran is
 // underlined: its hover shows its pattern's matchers, as they ran. Jumps to definitions
-// (Ctrl/⌘+click or F12 on a call) keep the scope and add to a breadcrumb; back and the
-// crumbs return. Without a path, it lists the sources that evaluated conditions.
+// (Ctrl/⌘+click or F12 on a call) go where clang resolved the call (xref.json), or else
+// to the definitions of the name (tags.json); they keep the scope and add to a
+// breadcrumb; back and the crumbs return. Without a path, it lists the sources that evaluated conditions.
 import { useEffect, useMemo, useState } from "react";
 import type { FileCoverage, IterationCoverage } from "../../core/mcdc.ts";
 import { describeScope, type CoverageScope, type TargetInfo } from "../../core/observatory.ts";
 import { lookup, type TagsFile } from "../../core/tags.ts";
+import { definitionAt, patternAt, type XrefFile } from "../../core/xref.ts";
 import type { MatchCall, Visit } from "../../core/types.ts";
 import { useAsync } from "../hooks/useAsync.ts";
 import { useDistJson } from "../hooks/useDistJson.ts";
@@ -29,7 +31,7 @@ import {
   type Navigation,
 } from "../model/navigation.ts";
 import { Pane } from "./Pane.tsx";
-import { SourceEditor, type Annotation } from "./SourceEditor.tsx";
+import { SourceEditor, type Annotation, type Followed } from "./SourceEditor.tsx";
 
 // A match(V, P) call of the run, with its iteration.
 export type RunMatchCall = MatchCall & { iteration: number };
@@ -50,6 +52,7 @@ export function SourcePane({ nav, onNavigate, target, coverage, visit, matches, 
   const files = useAsync(() => coverage(scope), [coverage, scope.iteration, scope.visit]);
   const covered = files && "value" in files ? files.value : null;
   const tags = useDistJson<TagsFile>("tags.json");
+  const xref = useDistJson<XrefFile>("xref.json");
   // The match calls that ran where the navigation started (its iteration and visit).
   const { iteration, visit: visitNumber } = nav.context;
   const calls = useMemo(
@@ -59,8 +62,9 @@ export function SourcePane({ nav, onNavigate, target, coverage, visit, matches, 
   const [notice, setNotice] = useState("");
   useEffect(() => setNotice(""), [nav]);
 
-  const follow = (name: string, args: number | null) => {
-    const [first, ...others] = tags ? lookup(tags, name, args) : [];
+  const follow = ({ name, line: at, column, args }: Followed) => {
+    const resolved = xref && path ? definitionAt(xref, path, at, column) : null;
+    const [first, ...others] = resolved ? [resolved] : tags ? lookup(tags, name, args) : [];
     if (!first) {
       setNotice(`no definition of ${name} in the observed sources`);
       return;
@@ -100,6 +104,7 @@ export function SourcePane({ nav, onNavigate, target, coverage, visit, matches, 
           scope={scope}
           file={covered?.files.get(path)}
           calls={calls}
+          xref={xref}
           callsWhere={describeScope({ iteration, visit: visitNumber })}
           loading={files === undefined}
           target={target}
@@ -211,17 +216,18 @@ interface SourceViewProps {
   scope: CoverageScope;
   file: FileCoverage | undefined;
   calls: MatchCall[]; // the match calls that ran where the navigation started
+  xref: XrefFile | null; // the calls' patterns
   callsWhere: string; // where that is
   loading: boolean; // the coverage is still being decoded
   target: TargetInfo | null; // line numbers link to the line on GitHub
   notice: string;
   alternatives: { path: string; line: number }[]; // other definitions of what was followed
   onAlternative(location: { path: string; line: number }): void;
-  onFollow(name: string, args: number | null): void;
+  onFollow(followed: Followed): void;
 }
 
 function SourceView(props: SourceViewProps) {
-  const { path, line, scope, file, calls, callsWhere, loading, target, notice, alternatives, onAlternative, onFollow } = props;
+  const { path, line, scope, file, calls, xref, callsWhere, loading, target, notice, alternatives, onAlternative, onFollow } = props;
   const source = useSource(path);
   const marks = useMemo(() => (source && file ? sourceMarks(file, source) : null), [source, file]);
   const annotations = useMemo<Annotation[]>(
@@ -230,9 +236,9 @@ function SourceView(props: SourceViewProps) {
         line: site.site.line,
         column: site.site.column,
         length: "match".length,
-        hover: callHover(site, callsWhere),
+        hover: callHover(site, callsWhere, xref ? patternAt(xref, site.site) : null),
       })),
-    [calls, path, callsWhere],
+    [calls, path, callsWhere, xref],
   );
 
   if (source === undefined) return <div className="trace-empty">loading {path}…</div>;
