@@ -43,7 +43,8 @@ for file in \
   lib/Transforms/AggressiveInstCombine/*.{cpp,h} \
   lib/Analysis/{InstructionSimplify,ConstantFolding,ValueTracking}.cpp \
   include/llvm/Transforms/InstCombine/*.h \
-  include/llvm/IR/PatternMatch.h; do
+  include/llvm/IR/PatternMatch.h \
+  include/llvm/Support/PatternMatchHelpers.h; do
   if [ -f "$file" ]; then cp --parents "$file" "$DIST/sources/"; fi
 done
 cd "$ROOT"

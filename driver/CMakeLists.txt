@@ -15,8 +15,11 @@ set(HOOKS -include "${OBSERVATORY_RUNTIME}/include/llvm_observatory/hooks.h")
 # code to the wrong inlined frames.
 # --system-header-prefix makes LLVM's own headers system headers, which coverage skips:
 # their inline functions would otherwise be instrumented again in every observed source.
+# PatternMatch is the exception: its matchers decide whether most folds apply.
 set(OBSERVE -O0 -g -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc
-  --system-header-prefix=llvm/ --system-header-prefix=llvm-c/)
+  --system-header-prefix=llvm/ --system-header-prefix=llvm-c/
+  --no-system-header-prefix=llvm/IR/PatternMatch.h
+  --no-system-header-prefix=llvm/Support/PatternMatchHelpers.h)
 
 # Whole libraries under observation.
 foreach(lib LLVMInstCombine LLVMAggressiveInstCombine)

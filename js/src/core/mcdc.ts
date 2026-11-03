@@ -74,45 +74,61 @@ export async function decodeProfile(tools: LlvmTools, binary: Uint8Array, profra
 }
 
 // The executed decisions and taken branches of an export, by source path.
+//
+// A function from a header (e.g. a PatternMatch template) has one record per
+// instantiation and per source that instantiates it, all with the same region; they are
+// merged: a decision keeps each distinct executed test vector, a branch sums its counts.
 export function summarize(report: CoverageExport): IterationCoverage {
+  const decisions = new Map<string, ExecutedDecision & { path: string }>();
+  const branches = new Map<string, TakenBranch & { path: string }>();
+
+  for (const fn of report.data[0]?.functions ?? []) {
+    for (const rec of fn.mcdc_records ?? []) {
+      const path = sourcePath(fn.filenames[rec[6]] ?? "");
+      const executed = rec[10].filter((tv) => tv.executed);
+      if (path === null || executed.length === 0) continue;
+      const key = regionKey(path, rec);
+      let d = decisions.get(key);
+      if (!d) decisions.set(key, (d = { path, ...region(rec), conditionCount: rec[9].length, vectors: [], results: [] }));
+      for (const tv of executed) addVector(d, tv);
+    }
+    for (const rec of fn.branches) {
+      const [, , , , trueCount, falseCount, fileId, , kind] = rec;
+      const path = sourcePath(fn.filenames[fileId] ?? "");
+      if (path === null || kind !== BRANCH_REGION || trueCount + falseCount === 0) continue;
+      const key = regionKey(path, rec);
+      const b = branches.get(key);
+      if (b) {
+        b.trueCount += trueCount;
+        b.falseCount += falseCount;
+      } else {
+        branches.set(key, { path, ...region(rec), trueCount, falseCount });
+      }
+    }
+  }
+
   const files: IterationCoverage = new Map();
-  const fileOf = (fn: ExportFunction, fileId: number) => {
-    const path = sourcePath(fn.filenames[fileId] ?? "");
-    if (path === null) return null;
+  const fileAt = (path: string) => {
     let file = files.get(path);
     if (!file) files.set(path, (file = { decisions: [], branches: [] }));
     return file;
   };
-  const seenBranches = new Set<string>();
-
-  for (const fn of report.data[0]?.functions ?? []) {
-    for (const rec of fn.mcdc_records ?? []) {
-      const executed = rec[10].filter((tv) => tv.executed);
-      if (executed.length === 0) continue;
-      fileOf(fn, rec[6])?.decisions.push({
-        ...region(rec),
-        conditionCount: rec[9].length,
-        vectors: executed.map((tv) => tv.conditions),
-        results: executed.map((tv) => tv.result),
-      });
-    }
-    for (const rec of fn.branches) {
-      const [, , , , trueCount, falseCount, fileId, , kind] = rec;
-      if (kind !== BRANCH_REGION || trueCount + falseCount === 0) continue;
-      // An inline function from a header appears once per including function.
-      const key = `${fileId}:${fn.filenames[fileId]}:${rec.slice(0, 4).join(":")}`;
-      if (seenBranches.has(key)) continue;
-      seenBranches.add(key);
-      fileOf(fn, fileId)?.branches.push({ ...region(rec), trueCount, falseCount });
-    }
-  }
-  for (const [path, file] of files) {
+  for (const { path, ...d } of decisions.values()) fileAt(path).decisions.push(d);
+  for (const [key, { path, ...b }] of branches) {
     // A decision's own branch region would repeat it as a plain condition.
-    const starts = new Set(file.decisions.map((d) => `${d.line}:${d.col}`));
-    file.branches = file.branches.filter((b) => !starts.has(`${b.line}:${b.col}`));
-    if (file.decisions.length === 0 && file.branches.length === 0) files.delete(path);
+    if (!decisions.has(key)) fileAt(path).branches.push(b);
   }
   return files;
+}
+
+const regionKey = (path: string, rec: number[] | McdcRecord) => `${path}:${rec.slice(0, 4).join(":")}`;
+
+function addVector(d: ExecutedDecision, tv: TestVector): void {
+  const same = (v: (boolean | null)[], n: number) =>
+    d.results[n] === tv.result && v.every((c, i) => c === tv.conditions[i]);
+  if (d.vectors.some(same)) return;
+  d.vectors.push(tv.conditions);
+  d.results.push(tv.result);
 }
 
 const region = (rec: number[] | McdcRecord): Region => ({
@@ -153,7 +169,8 @@ export interface SingleCondition extends TakenBranch {
 export function decisions(file: FileCoverage, source: string): Decision[] {
   const lines = source.split("\n");
   return file.decisions.map((d) => {
-    const text = spanText(lines, d);
+    // The region of a decision in `return a && b;` ends at the semicolon.
+    const text = spanText(lines, d).replace(/;\s*$/, "");
     const names = conditionTexts(text);
     const matches = names.length === d.conditionCount;
     const conditions: Condition[] = [];

@@ -120,13 +120,13 @@ An end-to-end input states what it expects in comments:
 
 - The observed sources are built at `-O0`, so InstCombine runs slower than in a release
   build. Optimized DWARF puts merged code under the wrong inlined frames.
-- Decoding an iteration's conditions takes about half a second: `llvm-cov export`
-  renders every instrumented function, not only those that ran. The web app decodes an
+- Decoding an iteration's conditions takes under a second: `llvm-cov export` renders
+  every instrumented function, not only those that ran. The web app decodes an
   iteration only when it is opened.
-- Only the observed sources' own functions are instrumented for coverage. The inline
-  functions of LLVM's headers (`llvm/...`, e.g. PatternMatch) are not, because they are
-  compiled again in every observed source. Their conditions are not shown, but
-  InstCombine's own headers (`InstCombineInternal.h`) are.
+- Coverage covers the observed sources, InstCombine's own headers and PatternMatch
+  (`PatternMatch.h`, `PatternMatchHelpers.h`), but not the inline functions of LLVM's
+  other headers (SmallVector, DenseMap, …): each would be instrumented again in every
+  observed source. A header function's records from all its instantiations are merged.
 - MC/DC needs two or more conditions (`&&`, `||`). A plain `if (c)` or `while (c)` shows
   only whether it was true, false or both, from its branch counters.
 - The source view shows the patched sources, as compiled, so that coverage columns match.

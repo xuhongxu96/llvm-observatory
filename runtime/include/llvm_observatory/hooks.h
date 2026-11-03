@@ -4,6 +4,9 @@
 #ifndef LLVM_OBSERVATORY_HOOKS_H
 #define LLVM_OBSERVATORY_HOOKS_H
 
+// Not under observation itself: no coverage for the hooks.
+#pragma clang system_header
+
 #include <type_traits>
 #include <utility>
 

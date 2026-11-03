@@ -39,12 +39,13 @@ was found the hard way:
   uninstrumented object, that DWARF claimed the code after it. With the observed
   objects first, the kept copy is an observed one, compiled the same way.
 - **LLVM's headers are system headers for the observed sources**
-  (`--system-header-prefix=llvm/`), so coverage skips their inline functions. Each
-  inline function was instrumented again in every observed source, which made 95% of
-  the 31k instrumented functions. Without them, profiles are 15x smaller, `llvm-cov
-  export` is about 3x faster, and the driver's JS is 286 KB instead of 24 MB.
-  (`-fprofile-list` cannot do this: its `source:` matches the translation unit, not the
-  header.)
+  (`--system-header-prefix=llvm/`), except PatternMatch (`--no-system-header-prefix`),
+  so coverage skips their inline functions. Each one was instrumented again in every
+  observed source: 95% of the 31k instrumented functions. With only PatternMatch kept
+  (about 10k functions), an iteration decodes in about 0.8 s instead of 5 s.
+  `-fprofile-list` cannot do this: its `source:` matches the translation unit, not the
+  header. `hooks.h` is `#pragma clang system_header` for the same reason.
+  `js/src/core/mcdc.ts` merges the records a header function has per instantiation.
 - **No PCH for observed sources.** Their flags differ from LLVM's shared precompiled
   headers.
 - **`LLVM_ENABLE_PIC=OFF`, `LLVM_ENABLE_PLUGINS=OFF`.**

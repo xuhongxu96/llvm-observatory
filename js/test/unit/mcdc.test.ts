@@ -47,7 +47,7 @@ describe("summarize", () => {
     const file = files.get("lib/Analysis/InstructionSimplify.cpp")!;
     expect(file.decisions).toHaveLength(1);
     expect(file.decisions[0].vectors).toEqual([[true, true, null], [false, null, null]]);
-    expect(file.branches).toEqual([{ line: 4, col: 7, endLine: 4, endCol: 7, trueCount: 2, falseCount: 0 }]);
+    expect(file.branches).toEqual([{ line: 4, col: 7, endLine: 4, endCol: 7, trueCount: 4, falseCount: 0 }]); // two records, summed
   });
 
   it("places decisions and their conditions in the source", () => {
@@ -84,6 +84,13 @@ describe("summarize", () => {
   });
 });
 
+describe("decisions in a return statement", () => {
+  it("leave out the semicolon", () => {
+    const file = { decisions: [{ line: 1, col: 10, endLine: 1, endCol: 18, conditionCount: 2, vectors: [[true, true]], results: [true] }], branches: [] };
+    expect(decisions(file, "  return a && b();").map((d) => d.conditionNames)).toEqual([["a", "b()"]]);
+  });
+});
+
 describe("condition text", () => {
   it("splits at && and || outside literals", () => {
     expect(conditionTexts("a && (b || c == '|') && s != \"&&\"")).toEqual(["a", "b", "c == '|'", "s != \"&&\""]);
@@ -106,5 +113,28 @@ describe("summarize with a decision's own branch region", () => {
     const rec = [2, 7, 2, 51, 0, 0, 0, 0, 5, [{}, {}], [{ executed: true, result: true, conditions: [true, null] }]];
     const files = summarize({ data: [{ functions: [{ filenames: [FILE], mcdc_records: [rec], branches: [[2, 7, 2, 51, 1, 0, 0, 0, 4]] }] }] } as never);
     expect(files.get("lib/Analysis/InstructionSimplify.cpp")!.branches).toEqual([]);
+  });
+});
+
+describe("summarize with one header function instantiated twice", () => {
+  const HEADER = "/t/llvm/include/llvm/IR/PatternMatch.h";
+  const instantiation = (vector: (boolean | null)[], result: boolean, counts: [number, number]) => ({
+    filenames: [HEADER],
+    mcdc_records: [[10, 5, 10, 20, 0, 0, 0, 0, 5, [{}, {}], [{ executed: true, result, conditions: vector }]]],
+    branches: [[12, 9, 12, 12, counts[0], counts[1], 0, 0, 4]],
+  });
+  const files = summarize({
+    data: [{ functions: [instantiation([true, true], true, [1, 0]), instantiation([false, null], false, [0, 2]), instantiation([true, true], true, [1, 0])] }],
+  } as never);
+  const file = files.get("include/llvm/IR/PatternMatch.h")!;
+
+  it("merges the decision's distinct test vectors", () => {
+    expect(file.decisions).toHaveLength(1);
+    expect(file.decisions[0].vectors).toEqual([[true, true], [false, null]]);
+    expect(file.decisions[0].results).toEqual([true, false]);
+  });
+
+  it("sums the branch counts", () => {
+    expect(file.branches).toEqual([{ line: 12, col: 9, endLine: 12, endCol: 12, trueCount: 2, falseCount: 2 }]);
   });
 });
