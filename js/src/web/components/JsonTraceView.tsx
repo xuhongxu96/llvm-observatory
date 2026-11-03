@@ -1,4 +1,4 @@
-// The trace as formatted JSON (the trace object of `observe.ts --json`), in a read-only
+// JSON (the trace object of `observe.ts --json`, or the raw events), formatted, in a read-only
 // editor: folding, search and selection come with it.
 import MonacoEditor from "@monaco-editor/react";
 import { useMonacoTheme } from "../hooks/useColorScheme.ts";

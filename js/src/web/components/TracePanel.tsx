@@ -1,5 +1,7 @@
-// The trace pane: the structured view, or the trace as JSON.
+// The trace pane: the structured view, the trace as JSON, or the runtime's events as it
+// emitted them (raw: before the trace is built and the stacks symbolized).
 import { useMemo, useState } from "react";
+import type { RawEvent } from "../../core/host.ts";
 import type { TargetInfo } from "../../core/observatory.ts";
 import type { Trace } from "../../core/types.ts";
 import { JsonTraceView } from "./JsonTraceView.tsx";
@@ -7,20 +9,29 @@ import { CopyButton, Pane } from "./Pane.tsx";
 import type { OpenSource } from "./SourceLocation.tsx";
 import { StructuredTraceView } from "./StructuredTraceView.tsx";
 
-const MODES = ["structured", "json"] as const;
+const MODES = ["structured", "json", "events"] as const;
 type Mode = (typeof MODES)[number];
 
-export function TracePanel({ trace, target, onOpen }: { trace: Trace | null; target: TargetInfo | null; onOpen: OpenSource }) {
+interface Props {
+  trace: Trace | null;
+  events: RawEvent[] | null;
+  target: TargetInfo | null;
+  onOpen: OpenSource;
+}
+
+export function TracePanel({ trace, events, target, onOpen }: Props) {
   const [mode, setMode] = useState<Mode>("structured");
   const [wordWrap, setWordWrap] = useState(false);
-  const json = useMemo(() => (trace ? JSON.stringify(trace, null, 2) : ""), [trace]);
+  const traceJson = useMemo(() => (trace && mode === "json" ? JSON.stringify(trace, null, 2) : ""), [trace, mode]);
+  const eventsJson = useMemo(() => (events && mode === "events" ? JSON.stringify(events, null, 2) : ""), [events, mode]);
+  const json = mode === "events" ? eventsJson : traceJson;
 
   const actions = (
     <>
-      {mode === "json" && (
+      {mode !== "structured" && (
         <>
           <CopyButton text={json} />
-          <DownloadButton text={json} name="trace.json" />
+          <DownloadButton text={json} name={mode === "events" ? "events.json" : "trace.json"} />
           <button type="button" className="pane-header-button" onClick={() => setWordWrap((w) => !w)}>
             wrap: {wordWrap ? "on" : "off"}
           </button>

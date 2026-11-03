@@ -1,6 +1,7 @@
 // One observatory session: the driver, the LLVM tools, and the build's metadata.
 // Shared by the CLI and the web worker; only the Dist (where files come from) differs.
 import { Driver } from "./driver.ts";
+import type { RawEvent } from "./host.ts";
 import type { ModuleSource } from "./emscripten.ts";
 import { LlvmTools, type ToolName } from "./llvm-tools.ts";
 import { decodeProfiles, type IterationCoverage } from "./mcdc.ts";
@@ -30,6 +31,7 @@ export interface Run {
   stderr: string;
   outputIr: string;
   trace: Trace;
+  events: RawEvent[]; // as the runtime emitted them, with their stacks' wasm addresses
   segments: Segment[];
   profiles: ProfileStore; // by segment
 }
@@ -62,6 +64,7 @@ export class Observatory {
       stderr: raw.stderr,
       outputIr: raw.outputIr,
       trace: buildTrace(raw.events, symbols),
+      events: raw.events,
       segments: segmentsOf(raw.events),
       profiles: raw.profiles,
     };

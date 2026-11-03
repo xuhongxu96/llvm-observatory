@@ -27,8 +27,8 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     case "run":
       await answer(data.id, async () => {
         lastRun = await ready().observe(data.ir);
-        const { status, stderr, outputIr, trace } = lastRun;
-        post({ type: "result", id: data.id, result: { status, stderr, outputIr, trace } });
+        const { status, stderr, outputIr, trace, events } = lastRun;
+        post({ type: "result", id: data.id, result: { status, stderr, outputIr, trace, events } });
       });
       break;
     case "coverage":

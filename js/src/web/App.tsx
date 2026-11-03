@@ -71,7 +71,7 @@ export function App() {
             <PanelGroup direction="vertical" autoSaveId="observatory-right">
               {/* id and order: the source panel comes and goes. */}
               <Panel id="trace" order={1} minSize={15}>
-                <TracePanel trace={result?.trace ?? null} target={observatory.target} onOpen={openSource} />
+                <TracePanel trace={result?.trace ?? null} events={result?.events ?? null} target={observatory.target} onOpen={openSource} />
               </Panel>
               {nav && (
                 <>

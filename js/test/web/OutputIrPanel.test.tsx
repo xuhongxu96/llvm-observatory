@@ -10,7 +10,7 @@ vi.mock("../../src/web/components/IrEditor.tsx", () => ({
   OutputIr: ({ ir, error }: { ir: string; error: string }) => <pre data-testid="ir">{error || ir}</pre>,
 }));
 
-const RESULT: RunResult = { status: 0, stderr: "", outputIr: "; final module", trace: TRACE };
+const RESULT: RunResult = { status: 0, stderr: "", outputIr: "; final module", trace: TRACE, events: [] };
 const picker = () => screen.getByLabelText("IR after") as HTMLSelectElement;
 const shown = () => screen.getByTestId("ir").textContent;
 

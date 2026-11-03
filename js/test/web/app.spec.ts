@@ -116,6 +116,15 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   expect(download.suggestedFilename()).toBe("trace.json");
   const saved = JSON.parse(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString()));
   expect(saved.iterations[0].pass).toBe("instcombine");
+
+  // The runtime's events as it emitted them, with their stacks' wasm addresses.
+  await page.getByRole("tab", { name: "events" }).click();
+  await expect(jsonPane.locator(".view-lines")).toContainText('"type": "iteration_begin"');
+  const [events] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "download" }).click()]);
+  expect(events.suggestedFilename()).toBe("events.json");
+  const raw = JSON.parse(await (await events.createReadStream()).toArray().then((c) => Buffer.concat(c).toString()));
+  expect(raw[0].data).toEqual({ type: "iteration_begin", iteration: 1, pass: "instcombine" });
+  expect(raw.find((e: { data: { type: string } }) => e.data.type === "value").stack[0]).toHaveProperty("offset");
   await page.getByRole("tab", { name: "structured" }).click();
 
   // From a visit's conditions to the whole iteration's, back at the rule.

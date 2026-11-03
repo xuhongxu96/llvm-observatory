@@ -1,4 +1,5 @@
 // Messages between the app and the observatory worker.
+import type { RawEvent } from "../../core/host.ts";
 import type { IterationCoverage } from "../../core/mcdc.ts";
 import type { CoverageScope, TargetInfo } from "../../core/observatory.ts";
 import type { Trace } from "../../core/types.ts";
@@ -13,6 +14,7 @@ export interface RunResult {
   stderr: string;
   outputIr: string;
   trace: Trace;
+  events: RawEvent[]; // as the runtime emitted them
 }
 
 export type WorkerResponse =
