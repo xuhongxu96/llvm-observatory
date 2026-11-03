@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { THEME } from "../monaco/theme.ts";
 
 export type ColorSchemePref = "light" | "dark" | "system";
 
@@ -69,6 +70,7 @@ export function useColorScheme(): {
   return { scheme, pref, setPref };
 }
 
-export function monacoBuiltinTheme(scheme: "light" | "dark"): "vs" | "vs-dark" {
-  return scheme === "dark" ? "vs-dark" : "vs";
+// The app's Monaco theme for the current scheme (src/web/monaco/theme.ts).
+export function useMonacoTheme(): string {
+  return THEME[useColorScheme().scheme];
 }

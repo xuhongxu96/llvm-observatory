@@ -1,12 +1,17 @@
-// A source's lines highlighted as C++ with tree-sitter (cached per path), or null until
-// the parser has loaded and run.
-import { useEffect, useState } from "react";
+// C++ highlighting for the source view: tree-sitter's highlight queries (C's, then C++'s,
+// which extends it) as a semantic tokens provider. Monaco's own C++ grammar is a lexer:
+// it colors keywords and literals but not types, functions or members.
+import type * as monacoApi from "monaco-editor";
 import cHighlights from "tree-sitter-c/queries/highlights.scm?raw";
 import cppHighlights from "tree-sitter-cpp/queries/highlights.scm?raw";
 import cppWasm from "tree-sitter-cpp/tree-sitter-cpp.wasm?url";
 import { Language, Parser, Query } from "web-tree-sitter";
 import parserWasm from "web-tree-sitter/web-tree-sitter.wasm?url";
-import { highlightLines, type Span } from "../model/highlight.ts";
+import { CATEGORIES, semanticTokens } from "../model/highlight.ts";
+
+type Monaco = typeof monacoApi;
+
+export const CPP = "cpp";
 
 interface Highlighter {
   parser: Parser;
@@ -14,9 +19,7 @@ interface Highlighter {
 }
 
 let highlighter: Promise<Highlighter> | null = null;
-const cache = new Map<string, Promise<Span[][]>>();
 
-// C++'s query extends C's: it is meant to follow it.
 function loadHighlighter(): Promise<Highlighter> {
   highlighter ??= (async () => {
     await Parser.init({ locateFile: () => parserWasm });
@@ -28,7 +31,7 @@ function loadHighlighter(): Promise<Highlighter> {
   return highlighter;
 }
 
-async function highlight(source: string): Promise<Span[][]> {
+async function tokens(source: string): Promise<Uint32Array> {
   const { parser, query } = await loadHighlighter();
   const tree = parser.parse(source);
   if (!tree) throw new Error("cannot parse");
@@ -39,26 +42,16 @@ async function highlight(source: string): Promise<Span[][]> {
       name: c.name,
       pattern: c.patternIndex,
     }));
-    return highlightLines(source, captures);
+    return semanticTokens(source, captures);
   } finally {
     tree.delete();
   }
 }
 
-export function useHighlight(path: string, source: string | null | undefined): Span[][] | null {
-  const [state, setState] = useState<{ path: string; lines: Span[][] } | null>(null);
-  useEffect(() => {
-    if (!source) return;
-    let lines = cache.get(path);
-    if (!lines) cache.set(path, (lines = highlight(source)));
-    let cancelled = false;
-    lines.then(
-      (result) => !cancelled && setState({ path, lines: result }),
-      (err: unknown) => console.warn(`cannot highlight ${path}`, err), // plain text then
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [path, source]);
-  return state?.path === path ? state.lines : null;
+export function registerCppHighlighting(monaco: Monaco): void {
+  monaco.languages.registerDocumentSemanticTokensProvider(CPP, {
+    getLegend: () => ({ tokenTypes: CATEGORIES, tokenModifiers: [] }),
+    provideDocumentSemanticTokens: async (model) => ({ data: await tokens(model.getValue()) }),
+    releaseDocumentSemanticTokens: () => {},
+  });
 }

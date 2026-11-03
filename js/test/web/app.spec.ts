@@ -26,17 +26,36 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   });
   expect(barOffset).toBe(0);
 
-  // The rule opens its source, with the iteration's MC/DC badges.
+  // The rule opens its source in a read-only editor, at the rule's line, with the
+  // iteration's MC/DC badges.
   await page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first().click();
-  await expect(page.locator(".source-code .row.current")).toContainText("if (Value *V = simplifyAddInst(");
+  const source = page.locator(".source-editor");
+  await expect(source.locator(".view-lines")).toContainText("if (Value *V = simplifyAddInst(");
+  await expect(source.locator(".source-line-current")).toHaveCount(1);
+  // ... centered in the editor, not at its top.
+  const position = await source.evaluate((editor) => {
+    const box = editor.getBoundingClientRect();
+    const current = editor.querySelector(".source-line-current")!.getBoundingClientRect();
+    return (current.top + current.height / 2 - box.top) / box.height;
+  });
+  expect(position).toBeGreaterThan(0.35);
+  expect(position).toBeLessThan(0.65);
   await expect(page.locator(".source-status")).toContainText("evaluated in this iteration", { timeout: 60_000 });
-  await expect(page.locator(".source-code .badge").first()).toBeVisible();
-  // Highlighted as C++, with line numbers linking to the line on GitHub.
-  await expect(page.locator(".source-code .hl-function").first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".source-code .row.current a.no")).toHaveAttribute(
-    "href",
+  await expect(source.locator(".badge").first()).toBeVisible();
+  // Highlighted as C++ (tree-sitter semantic tokens): a method call in the theme's function color.
+  await expect(source.locator(".view-line span", { hasText: /^getOperand$/ }).first()).toHaveCSS("color", "rgb(121, 94, 38)", {
+    timeout: 30_000,
+  });
+  // A line number opens the line on GitHub, at the observed commit.
+  await page.context().route("https://github.com/**", (route) => route.fulfill({ body: "github" }));
+  const [github] = await Promise.all([
+    page.waitForEvent("popup"),
+    source.locator(".line-numbers", { hasText: /^1592$/ }).click(),
+  ]);
+  expect(github.url()).toMatch(
     /^https:\/\/github\.com\/llvm\/llvm-project\/blob\/[0-9a-f]{40}\/llvm\/lib\/Transforms\/InstCombine\/InstCombineAddSub\.cpp#L1592$/,
   );
+  await github.close();
 
   // Long source lines scroll inside the source pane; the page never gets wider.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

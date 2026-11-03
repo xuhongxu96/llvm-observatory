@@ -1,16 +1,15 @@
 // An observed source with the MC/DC values of one iteration: a badge after each
 // condition (T, F, – not evaluated, T/F both) and after each decision (its outcome).
 // Without a path, it lists the sources the iteration evaluated conditions in.
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import type { FileCoverage, IterationCoverage } from "../../core/mcdc.ts";
 import type { TargetInfo } from "../../core/observatory.ts";
 import { useAsync } from "../hooks/useAsync.ts";
-import { useHighlight } from "../hooks/useHighlight.ts";
 import { useSource } from "../hooks/useSource.ts";
-import { isBadge, sourceMarks, splitLine, type Badge } from "../model/badges.ts";
-import { lineSpans } from "../model/highlight.ts";
+import { sourceMarks } from "../model/badges.ts";
 import { githubUrl } from "../model/github.ts";
 import { Pane } from "./Pane.tsx";
+import { SourceEditor } from "./SourceEditor.tsx";
 import type { OpenSource, SourceSelection } from "./SourceLocation.tsx";
 
 interface Props {
@@ -102,13 +101,7 @@ interface SourceViewProps {
 
 function SourceView({ path, line, file, loading, target }: SourceViewProps) {
   const source = useSource(path);
-  const highlighted = useHighlight(path, source);
   const marks = useMemo(() => (source && file ? sourceMarks(file, source) : null), [source, file]);
-  const currentRow = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    currentRow.current?.scrollIntoView({ block: "center" });
-  }, [source, line]);
 
   if (source === undefined) return <div className="trace-empty">loading {path}…</div>;
   if (source === null) return <div className="trace-empty">{path} is not in this build's sources</div>;
@@ -122,46 +115,8 @@ function SourceView({ path, line, file, loading, target }: SourceViewProps) {
             ? `evaluated in this iteration: ${plural(marks.decisions.length, "decision")} (&&, ||) and ${plural(marks.conditions, "plain condition")}`
             : "no condition of this file was evaluated in this iteration"}
       </div>
-      <div className="source-code">
-        {source.split("\n").map((text, i) => {
-          const n = i + 1;
-          const badges = marks?.badges.get(n);
-          return (
-            <div key={n} ref={n === line ? currentRow : undefined} className={`row${n === line ? " current" : ""}${badges ? " hit" : ""}`}>
-              {target ? (
-                <a className="no" href={githubUrl(target, path, n)} target="_blank" rel="noopener noreferrer" title="open on GitHub">
-                  {n}
-                </a>
-              ) : (
-                <div className="no">{n}</div>
-              )}
-              <div className="src">
-                {splitLine(lineSpans(text, highlighted?.[i]), badges).map((part, k) =>
-                  isBadge(part) ? (
-                    <BadgeView key={k} badge={part} />
-                  ) : part.cls ? (
-                    <span key={k} className={part.cls}>
-                      {part.text}
-                    </span>
-                  ) : (
-                    part.text
-                  ),
-                )}
-                {text === "" && "​"}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <SourceEditor path={path} source={source} marks={marks} line={line} target={target} />
     </div>
-  );
-}
-
-function BadgeView({ badge }: { badge: Badge }) {
-  return (
-    <span className={`badge ${badge.kind}`} title={badge.title}>
-      {badge.text}
-    </span>
   );
 }
 

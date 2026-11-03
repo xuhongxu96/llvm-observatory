@@ -1,7 +1,6 @@
 // MC/DC badges for the source view: one after each condition with the values it took,
 // one after each decision with its outcome, and one after each plain if/while.
 import { decisions, singleConditions, valueLabel, type Decision, type FileCoverage } from "../../core/mcdc.ts";
-import type { Span } from "./highlight.ts";
 
 export type BadgeKind = "T" | "F" | "M" | "none" | "result";
 
@@ -54,26 +53,3 @@ function valueBadge(values: (boolean | null)[]): { text: string; kind: BadgeKind
   const kind: BadgeKind = text.includes("/") ? "M" : text === "T" ? "T" : text === "F" ? "F" : "none";
   return { text, kind };
 }
-
-// A line's spans with its badges placed between them, in order: a badge inside a span
-// splits it; badges at or past the end of the line come last.
-export function splitLine(spans: Span[], badges: Badge[] = []): (Span | Badge)[] {
-  const parts: (Span | Badge)[] = [];
-  let next = 0; // the next badge to place
-  let pos = 0; // the column where the span starts
-  for (const { text, cls } of spans) {
-    let from = 0;
-    while (next < badges.length && badges[next].column < pos + text.length) {
-      const cut = Math.max(badges[next].column - pos, from);
-      if (cut > from) parts.push({ text: text.slice(from, cut), cls });
-      from = cut;
-      parts.push(badges[next++]);
-    }
-    if (from < text.length) parts.push({ text: text.slice(from), cls });
-    pos += text.length;
-  }
-  parts.push(...badges.slice(next));
-  return parts;
-}
-
-export const isBadge = (part: Span | Badge): part is Badge => "kind" in part;

@@ -1,17 +1,17 @@
 // The trace as text (src/core/text.ts), in a read-only editor.
 import MonacoEditor from "@monaco-editor/react";
-import { useColorScheme } from "../hooks/useColorScheme.ts";
-import { registerTraceLanguage, TRACE, TRACE_THEME } from "../monaco/traceLanguage.ts";
+import { useMonacoTheme } from "../hooks/useColorScheme.ts";
+import { setupMonaco } from "../monaco/setup.ts";
+import { TRACE } from "../monaco/traceLanguage.ts";
 
 export function TextTraceView({ text, wordWrap }: { text: string; wordWrap: boolean }) {
-  const { scheme } = useColorScheme();
+  const theme = useMonacoTheme();
   return (
     <MonacoEditor
       value={text || "— press Run to observe InstCombine —"}
       language={TRACE}
-      // The themes must exist before the editor applies one: Monaco's theme is global.
-      beforeMount={registerTraceLanguage}
-      theme={TRACE_THEME[scheme]}
+      beforeMount={setupMonaco}
+      theme={theme}
       options={{
         readOnly: true,
         domReadOnly: true,
