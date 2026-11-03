@@ -38,10 +38,13 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <set>
 #include <string>
 #include <vector>
@@ -196,11 +199,30 @@ void end_segment() {
   __llvm_profile_reset_counters();
 }
 
+// CmpInst::Predicate by name, as the IR writes it (its values are the same in every
+// LLVM version), or null.
+const char *predicate_name(long long P) {
+  static const char *const FCmp[] = {"false", "oeq", "ogt", "oge", "olt", "ole", "one", "ord",
+                                     "uno",   "ueq", "ugt", "uge", "ult", "ule", "une", "true"};
+  static const char *const ICmp[] = {"eq", "ne", "ugt", "uge", "ult", "ule", "sgt", "sge", "slt", "sle"};
+  if (P >= 0 && P < 16)
+    return FCmp[P];
+  if (P >= 32 && P < 42)
+    return ICmp[P - 32];
+  return nullptr;
+}
+
+// A pointer that can point at a Value. Some functions return a sentinel instead
+// (InstCombiner::getFreelyInvertedImpl: `(Value *)1` for "invertible", without a builder).
+bool is_value(const llvm::Value *V) {
+  return V && reinterpret_cast<std::uintptr_t>(V) % alignof(llvm::Value) == 0;
+}
+
 } // namespace
 
 void on_value(const llvm::Value *V) {
   State &S = state();
-  if (S.Depth == 0 || !V || !S.Seen.insert(V).second)
+  if (S.Depth == 0 || !is_value(V) || !S.Seen.insert(V).second)
     return;
   Json J = event("value");
   describe(J, "value", *V);
@@ -327,6 +349,25 @@ void note_apfloat(int Node, const char *Name, const void *Value) {
   add_binding(Node, Name, V ? std::string(Text.str()) : "null");
 }
 void note_integer(int Node, const char *Name, long long V) { add_binding(Node, Name, std::to_string(V)); }
+void note_type(int Node, const char *Name, const void *T) {
+  const auto *Ty = static_cast<const llvm::Type *>(T);
+  add_binding(Node, Name, Ty ? printed([&](llvm::raw_ostream &OS) { Ty->print(OS); }) : "null");
+}
+void note_enum(int Node, const char *Name, long long V, const char *Function) {
+  const char *Text = std::strstr(Function, "CmpInst::Predicate") ? predicate_name(V) : nullptr;
+  add_binding(Node, Name, Text ? Text : std::to_string(V));
+}
+void note_predicate(int Node, const char *Name, int Predicate, bool SameSign) {
+  const char *Text = predicate_name(Predicate);
+  std::string Shown = Text ? Text : std::to_string(Predicate);
+  add_binding(Node, Name, SameSign ? "samesign " + Shown : Shown);
+}
+void note_integers(int Node, const char *Name, const int *Data, std::size_t Size) {
+  std::string Shown = "<";
+  for (std::size_t I = 0; I < Size; ++I)
+    Shown += (I ? ", " : "") + (Data[I] < 0 ? std::string("poison") : std::to_string(Data[I]));
+  add_binding(Node, Name, Shown + ">");
+}
 } // namespace detail
 
 } // namespace llvm_obs

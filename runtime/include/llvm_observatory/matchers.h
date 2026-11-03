@@ -19,13 +19,21 @@ namespace llvm_obs {
 namespace detail {
 // What a matcher binds, by type. The pointers are type-erased; the runtime casts them back.
 void note_value(int Node, const char *Name, const void *V);   // a const llvm::Value *
+void note_type(int Node, const char *Name, const void *T);    // a const llvm::Type *
 void note_apint(int Node, const char *Name, const void *V);   // a const llvm::APInt *
 void note_apfloat(int Node, const char *Name, const void *V); // a const llvm::APFloat *
 void note_integer(int Node, const char *Name, long long V);
+// An enum, with its type's name (in `Function`: __PRETTY_FUNCTION__ of type_name<E>).
+// CmpInst::Predicate is shown by name.
+void note_enum(int Node, const char *Name, long long V, const char *Function);
+void note_predicate(int Node, const char *Name, int Predicate, bool SameSign); // llvm::CmpPredicate
+void note_integers(int Node, const char *Name, const int *Data, std::size_t Size); // ArrayRef<int>
 
 // Overloads of higher rank are tried first.
 template <int N> struct Rank : Rank<N - 1> {};
 template <> struct Rank<0> {};
+
+template <typename T> const char *type_name() { return __PRETTY_FUNCTION__; }
 
 // An IR value (llvm::Value and its subclasses) has stripPointerCasts, which returns its
 // Value base: `const llvm::Value *`.
@@ -38,10 +46,14 @@ auto value_of(const P *V, Rank<1>) -> decltype(static_cast<const void *>(ValuePo
 template <typename P> const void *value_of(const P *, Rank<0>) { return nullptr; }
 
 template <typename P>
-auto note_pointer(int N, const char *Name, const P *X, Rank<3>) -> decltype(void(ValuePointer<P>())) {
+auto note_pointer(int N, const char *Name, const P *X, Rank<4>) -> decltype(void(ValuePointer<P>())) {
   note_value(N, Name, value_of(X, Rank<1>()));
 }
-// llvm::APInt (getActiveBits) and llvm::APFloat (bitcastToAPInt).
+// llvm::Type (getTypeID), llvm::APInt (getActiveBits) and llvm::APFloat (bitcastToAPInt).
+template <typename P>
+auto note_pointer(int N, const char *Name, const P *X, Rank<3>) -> decltype(void(X->getTypeID())) {
+  note_type(N, Name, X);
+}
 template <typename P>
 auto note_pointer(int N, const char *Name, const P *X, Rank<2>) -> decltype(void(X->getActiveBits())) {
   note_apint(N, Name, X);
@@ -52,15 +64,32 @@ auto note_pointer(int N, const char *Name, const P *X, Rank<1>) -> decltype(void
 }
 template <typename P> void note_pointer(int, const char *, const P *, Rank<0>) {} // nothing to show
 
-template <typename T> void note(int N, const char *Name, T *X) { note_pointer(N, Name, X, Rank<3>()); }
+// llvm::CmpPredicate (hasSameSign; it converts to CmpInst::Predicate) and ranges of int
+// (ArrayRef<int>: a shuffle mask).
 template <typename T>
-typename std::enable_if<std::is_integral<T>::value || std::is_enum<T>::value>::type note(int N, const char *Name,
-                                                                                         T X) {
+auto note_object(int N, const char *Name, const T &X, Rank<2>) -> decltype(void(X.hasSameSign())) {
+  note_predicate(N, Name, static_cast<int>(X), X.hasSameSign());
+}
+template <typename T>
+auto note_object(int N, const char *Name, const T &X, Rank<1>)
+    -> decltype(void(static_cast<const int *>(X.data())), void(static_cast<std::size_t>(X.size()))) {
+  note_integers(N, Name, X.data(), X.size());
+}
+template <typename T> void note_object(int, const char *, const T &, Rank<0>) {} // nothing to show
+
+template <typename T> void note(int N, const char *Name, T *X) { note_pointer(N, Name, X, Rank<4>()); }
+template <typename T>
+typename std::enable_if<std::is_integral<T>::value>::type note(int N, const char *Name, T X) {
   note_integer(N, Name, static_cast<long long>(X));
 }
 template <typename T>
-typename std::enable_if<!std::is_pointer<T>::value && !std::is_integral<T>::value && !std::is_enum<T>::value>::type
-note(int, const char *, const T &) {} // nothing to show
+typename std::enable_if<std::is_enum<T>::value>::type note(int N, const char *Name, T X) {
+  note_enum(N, Name, static_cast<long long>(X), type_name<T>());
+}
+template <typename T>
+typename std::enable_if<std::is_class<T>::value>::type note(int N, const char *Name, const T &X) {
+  note_object(N, Name, X, Rank<2>());
+}
 } // namespace detail
 
 // One run of a matcher's match method inside a match call (match_begin, in hooks.h): the

@@ -16,7 +16,8 @@ definition, if it is in the sources. A pattern is keyed by where its match call 
     {"name": "m_Add", "text": "m_Add(m_Value(X), m_One())",
      "classes": ["BinaryOp_match"],      # the matcher type and its bases
      "args": [<pattern>, ...],           # the sub-patterns
-     "vars": ["X"]}                      # the other arguments (what it binds to)
+     "vars": [{"text": "X", "out": true}]}  # the other arguments; out: the matcher
+                                         # binds it (a non-const reference parameter)
 
 The runtime names a matcher by its class (runtime/include/llvm_observatory/matchers.h),
 so the classes line up the matchers that ran with the pattern as written.
@@ -155,20 +156,22 @@ class Unit:
             self.index.patterns[(path, start.line, start.column)] = patterns[0]
 
     def patterns(self, expression: cindex.Cursor) -> list[dict]:
-        """The matcher calls in an expression, outermost first (through conversions and
-        copies)."""
-        if expression.kind == K.CALL_EXPR and is_function(expression.referenced):
+        """The matchers made in an expression, outermost first (through conversions and
+        copies): calls of functions (m_Add(…)) and of matchers' constructors (m_Mask(…))."""
+        if expression.kind == K.CALL_EXPR and (is_function(expression.referenced) or is_matcher_constructor(expression)):
             return [self.pattern(expression)]
         return [p for child in expression.get_children() for p in self.patterns(child)]
 
     def pattern(self, call: cindex.Cursor) -> dict:
         args, vars = [], []
-        for arg in call.get_arguments():
+        parameters = list(call.referenced.type.argument_types())
+        for i, arg in enumerate(call.get_arguments()):
             sub = self.patterns(arg)
             if sub:
                 args.extend(sub)
             else:
-                vars.append(self.text(arg))
+                out = i < len(parameters) and is_output(parameters[i])
+                vars.append({"text": self.text(arg), "out": out})
         return {
             "name": call.spelling,
             "text": self.text(call),
@@ -178,8 +181,26 @@ class Unit:
         }
 
 
+def is_output(parameter: cindex.Type) -> bool:
+    """A parameter the matcher binds: a reference to non-const (Value *&, APInt *&,
+    CmpPredicate &, ArrayRef<int> &)."""
+    return parameter.kind == cindex.TypeKind.LVALUEREFERENCE and not parameter.get_pointee().is_const_qualified()
+
+
 def is_function(cursor: cindex.Cursor | None) -> bool:
     return cursor is not None and cursor.kind in (K.FUNCTION_DECL, K.FUNCTION_TEMPLATE)
+
+
+def is_matcher_constructor(call: cindex.Cursor) -> bool:
+    """A constructor of a class with a match method, written out (not a copy, a move or
+    an implicit conversion)."""
+    target = call.referenced
+    if target is None or target.kind != K.CONSTRUCTOR or target.is_copy_constructor() or target.is_move_constructor():
+        return False
+    tokens = list(call.get_tokens())
+    if not tokens or tokens[0].spelling != call.spelling:
+        return False
+    return any(m.spelling == "match" for m in target.semantic_parent.get_children())
 
 
 def classes(decl: cindex.Cursor) -> list[str]:

@@ -35,13 +35,13 @@ export interface NamedRun {
 // Names the runs after `pattern`. A run takes the sub-pattern (of its parent's) whose
 // matcher has its class, the next one in order when several do (a commutative matcher
 // tries its operands twice, a combinator its alternatives). A run that takes none is
-// the inner working of its parent's matcher: it keeps its class, and its own runs look
-// for the parent's sub-patterns.
+// the inner working of its parent's matcher (`owner`): it keeps its class, and its own
+// runs look for the parent's sub-patterns.
 export function nameRuns(runs: MatcherRun[], pattern: Pattern | null): NamedRun[] {
-  return named(runs, pattern ? [pattern] : []);
+  return named(runs, pattern ? [pattern] : [], null);
 }
 
-function named(runs: MatcherRun[], candidates: Pattern[]): NamedRun[] {
+function named(runs: MatcherRun[], candidates: Pattern[], owner: Pattern | null): NamedRun[] {
   let next = 0;
   return runs.map((outer) => {
     const order = candidates.map((_, i) => (next + i) % candidates.length);
@@ -53,8 +53,8 @@ function named(runs: MatcherRun[], candidates: Pattern[]): NamedRun[] {
       label: pattern ? labelOf(pattern) : run.name,
       value: run.value,
       result: run.result,
-      bound: pattern ? boundAs(run.bound, pattern.vars) : run.bound,
-      matchers: named(run.matchers, pattern ? pattern.args : candidates),
+      bound: boundAs(run.bound, pattern ?? owner),
+      matchers: named(run.matchers, pattern ? pattern.args : candidates, pattern ?? owner),
     };
   });
 }
@@ -73,9 +73,10 @@ function unwrap(run: MatcherRun, classes: string[]): MatcherRun {
 const labelOf = (p: Pattern) => (p.args.length > 0 ? `${p.name}(…)` : p.text);
 
 // What a matcher bound, under the names of the variables it binds (m_APInt(C): C, not
-// its member Res), when they pair up.
-function boundAs(bound: NamedRun["bound"], vars: string[]): NamedRun["bound"] {
-  return bound.length === vars.length ? bound.map((b, i) => ({ ...b, name: vars[i] })) : bound;
+// its member Res): its output arguments, in order, when they pair up with the bindings.
+function boundAs(bound: NamedRun["bound"], pattern: Pattern | null): NamedRun["bound"] {
+  const outs = pattern?.vars.filter((v) => v.out) ?? [];
+  return bound.length > 0 && bound.length === outs.length ? bound.map((b, i) => ({ ...b, name: outs[i].text })) : bound;
 }
 
 const SHOWN_RUNS = 8;

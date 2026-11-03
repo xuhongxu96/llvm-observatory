@@ -27,12 +27,12 @@ describe("callSites", () => {
 });
 
 // m_Add(m_Value(X), m_Zero()), as scripts/xref.py writes it.
-const leaf = (name: string, text: string, classes: string[], vars: string[] = []): Pattern => ({ name, text, classes, args: [], vars });
+const leaf = (name: string, text: string, classes: string[], vars: Pattern["vars"] = []): Pattern => ({ name, text, classes, args: [], vars });
 const pattern: Pattern = {
   name: "m_Add",
   text: "m_Add(m_Value(X), m_Zero())",
   classes: ["BinaryOp_match"],
-  args: [leaf("m_Value", "m_Value(X)", ["match_bind"], ["X"]), leaf("m_Zero", "m_Zero()", ["cstval_pred_ty"])],
+  args: [leaf("m_Value", "m_Value(X)", ["match_bind"], [{ text: "X", out: true }]), leaf("m_Zero", "m_Zero()", ["cstval_pred_ty"])],
   vars: [],
 };
 
@@ -64,6 +64,32 @@ describe("nameRuns", () => {
     const forwarding = run("BinaryOp_match", "i32 %a", true, [add]);
     expect(treeLines(nameRuns([forwarding], pattern))[0]).toBe("m_Add(…)  i32 %a  ✓");
     expect(nameRuns([forwarding], pattern)[0].matchers).toHaveLength(2);
+  });
+
+  it("pairs the bindings with the arguments the matcher binds, not those it reads", () => {
+    // m_ICmp(Pred, m_Specific(A), m_APInt(C)) on older LLVM: m_ICmp binds Pred.
+    const icmp: Pattern = {
+      name: "m_ICmp",
+      text: "m_ICmp(Pred, m_Specific(A), m_APInt(C))",
+      classes: ["CmpClass_match"],
+      args: [leaf("m_Specific", "m_Specific(A)", ["specificval_ty"], [{ text: "A", out: false }]), leaf("m_APInt", "m_APInt(C)", ["ap_match"], [{ text: "C", out: true }])],
+      vars: [{ text: "Pred", out: true }],
+    };
+    const ran = run("CmpClass_match", "i1 %c", true, [run("specificval_ty", "i32 %a", true), run("ap_match", "i32 7", true, [], [{ name: "Res", value: "7" }])], [
+      { name: "Predicate", value: "slt" },
+    ]);
+    expect(treeLines(nameRuns([ran], icmp))).toEqual([
+      "m_ICmp(…)  i1 %c  ✓  Pred = slt",
+      "├ m_Specific(A)  i32 %a  ✓",
+      "└ m_APInt(C)  i32 7  ✓  C = 7",
+    ]);
+  });
+
+  it("names what a matcher's inner working binds after the matcher", () => {
+    // m_Value(X, m_Zero()): a match_combine_and whose match_bind binds X.
+    const both: Pattern = { name: "m_Value", text: "m_Value(X, m_Zero())", classes: ["match_combine_and"], args: [leaf("m_Zero", "m_Zero()", ["is_zero"])], vars: [{ text: "X", out: true }] };
+    const ran = run("match_combine_and", "i32 0", true, [run("match_bind", "i32 0", true, [], [{ name: "VR", value: "i32 0" }]), run("is_zero", "i32 0", true)]);
+    expect(treeLines(nameRuns([ran], both))).toEqual(["m_Value(…)  i32 0  ✓", "├ match_bind  i32 0  ✓  X = i32 0", "└ m_Zero()  i32 0  ✓"]);
   });
 
   it("takes the sub-patterns in turn when several fit (a commutative matcher)", () => {

@@ -29,8 +29,11 @@ layout and its commands; read it first.
   stay C++11-compatible (LLVM 8 and 9 build as C++11).
 - **`matchers.h` declares no LLVM name.** A forward-declared `llvm::Value` makes `Value`
   ambiguous in sources that also use `llvm::json::Value` (TextAPI). It recognizes
-  LLVM's types by their members (`stripPointerCasts`, `getActiveBits`,
-  `bitcastToAPInt`) when a matcher is instantiated, and passes them type-erased.
+  LLVM's types by their members when a matcher is instantiated (`stripPointerCasts`:
+  Value, `getTypeID`: Type, `getActiveBits`: APInt, `bitcastToAPInt`: APFloat,
+  `hasSameSign`: CmpPredicate, `data`/`size` of `int`: masks), enums by their name
+  (`__PRETTY_FUNCTION__`; CmpInst::Predicate is printed by name), and passes them
+  type-erased.
 - **The tools match emcc, not the target.** `llvm-cov`/`llvm-profdata`/`llvm-symbolizer`
   are built from the infra tree (`infra_commit.txt`, emcc's LLVM) and read profiles of
   any target.
@@ -68,7 +71,9 @@ clang resolved the call; overloads of the same arity differ only by type. libcla
 the glibc of nixpkgs, so the flake points uv at its Python (`UV_PYTHON`). The match
 calls' patterns are recorded with each matcher's class and bases;
 `js/src/web/model/matchCalls.ts` names the runs after them (a run of the parent's own
-class on the same value is folded into it: forwarding `match` methods).
+class on the same value is folded into it: forwarding `match` methods). What they bind is
+named after their output arguments (non-const reference parameters, by clang), in
+order; a run the pattern does not write (a matcher's inner working) takes its owner's.
 
 `scripts/tags.py` is the fallback for names clang did not resolve (in templates):
 the shipped sources' functions by tree-sitter's C++ tags query, with a definition flag

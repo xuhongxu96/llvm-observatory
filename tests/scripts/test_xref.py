@@ -26,6 +26,9 @@ template <typename L, typename R> struct BinaryOp_match {
 };
 inline match_bind m_Value(Value *&V) { return {V}; }
 inline is_zero m_Zero() { return {}; }
+struct specificval_ty { const Value *Val; template <typename T> bool match(T *V) const { return V == Val; } };
+inline specificval_ty m_Specific(const Value *V) { return {V}; }
+struct m_Mask { int *&Mask; m_Mask(int *&M) : Mask(M) {} bool match(Value *) { return true; } };
 template <typename L, typename R> BinaryOp_match<L, R> m_Add(const L &A, const R &B) { return {A, B}; }
 } // namespace PatternMatch
 } // namespace llvm
@@ -40,7 +43,7 @@ bool recurrence(const PHINode *P, int *&X) { return P; }
 bool recurrence(const BinaryOperator *I, int *&X) { return I; }
 bool f(BinaryOperator *I, PHINode *P, int *X) {
   Value *A;
-  return recurrence(I, X) && recurrence(P, X) && match(I, m_Add(m_Value(A), m_Zero()));
+  return recurrence(I, X) && recurrence(P, X) && match(I, m_Add(m_Value(A), m_Specific(P))) && match(I, m_Mask(X));
 }
 """
 
@@ -62,9 +65,12 @@ def test_xref(tmp_path: Path):
     assert calls[(10, 30)] == ("lib/f.cpp", 6)  # recurrence(P, X): the PHINode overload
 
     pattern = out["patterns"]["lib/f.cpp"]["10:50"]
-    assert pattern["name"] == "m_Add" and pattern["text"] == "m_Add(m_Value(A), m_Zero())"
+    assert pattern["name"] == "m_Add" and pattern["text"] == "m_Add(m_Value(A), m_Specific(P))"
     assert pattern["classes"] == ["BinaryOp_match"]
     assert [(p["text"], p["classes"], p["vars"]) for p in pattern["args"]] == [
-        ("m_Value(A)", ["match_bind"], ["A"]),
-        ("m_Zero()", ["is_zero"], []),
+        ("m_Value(A)", ["match_bind"], [{"text": "A", "out": True}]),  # binds A
+        ("m_Specific(P)", ["specificval_ty"], [{"text": "P", "out": False}]),  # reads P
     ]
+    # A matcher made by its constructor.
+    mask = next(p for k, p in out["patterns"]["lib/f.cpp"].items() if p["name"] == "m_Mask")
+    assert (mask["text"], mask["vars"]) == ("m_Mask(X)", [{"text": "X", "out": True}])

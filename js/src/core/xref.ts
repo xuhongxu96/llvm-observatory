@@ -10,7 +10,7 @@ export interface Pattern {
   text: string; // as written
   classes: string[]; // the matcher's class and its bases, e.g. BinaryOp_match
   args: Pattern[]; // the sub-patterns
-  vars: string[]; // the other arguments: what it binds to, e.g. X
+  vars: { text: string; out: boolean }[]; // the other arguments; out: it binds them (X)
 }
 
 // xref.json as written by scripts/xref.py.
