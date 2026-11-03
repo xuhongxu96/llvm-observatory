@@ -37,13 +37,14 @@ export function matchReplacement(r: Replacement, f: Filters): boolean {
   );
 }
 
-// The iterations with at least one record left after filtering.
+// The iterations with the records that pass the filters. Without filters, every
+// iteration, also one that changed nothing (InstCombine's last): the optimized IR panel
+// lists it. With filters, only those with records left.
 export function filterIterations(iterations: Iteration[], f: Filters): Iteration[] {
-  return iterations
-    .map((it) => ({
-      ...it,
-      values: it.values.filter((v) => matchValue(v, f)),
-      replacements: it.replacements.filter((r) => matchReplacement(r, f)),
-    }))
-    .filter((it) => it.values.length > 0 || it.replacements.length > 0);
+  const filtered = iterations.map((it) => ({
+    ...it,
+    values: it.values.filter((v) => matchValue(v, f)),
+    replacements: it.replacements.filter((r) => matchReplacement(r, f)),
+  }));
+  return isFiltering(f) ? filtered.filter((it) => it.values.length > 0 || it.replacements.length > 0) : filtered;
 }

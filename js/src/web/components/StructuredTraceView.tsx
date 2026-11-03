@@ -61,9 +61,9 @@ export function StructuredTraceView({ iterations, target, onOpen }: Props) {
         </div>
       )}
 
-      {shown.map((it) => (
-        <details key={it.number} open className="trace-iteration">
-          <summary>
+      {shown.map((it) => {
+        const header = (
+          <>
             <span className="iter-num">Iteration {it.number}</span>
             <span className="iter-pass">{it.pass}</span>
             <span className="iter-counts">
@@ -73,33 +73,45 @@ export function StructuredTraceView({ iterations, target, onOpen }: Props) {
             <button
               type="button"
               className="pane-header-button"
-              title="the conditions this iteration evaluated (MC/DC)"
+              title="the LLVM sources this iteration ran, and how their conditions turned out"
               onClick={(e) => {
                 e.preventDefault();
                 onOpen({ scope: { iteration: it.number }, path: null, line: null });
               }}
             >
-              conditions
+              coverage
             </button>
-          </summary>
-          {it.values.length > 0 && (
-            <section className="iter-section">
-              <h4>Values</h4>
-              {it.values.map((v) => (
-                <ValueCard key={v.value.ptr} record={v} iteration={it.number} target={target} onOpen={onOpen} />
-              ))}
-            </section>
-          )}
-          {it.replacements.length > 0 && (
-            <section className="iter-section">
-              <h4>Replacements</h4>
-              {it.replacements.map((r, i) => (
-                <ReplacementRow key={`${r.old.ptr}-${i}`} record={r} iteration={it.number} target={target} onOpen={onOpen} />
-              ))}
-            </section>
-          )}
-        </details>
-      ))}
+          </>
+        );
+        // An iteration that changed nothing (InstCombine's last) has nothing to expand.
+        if (it.values.length === 0 && it.replacements.length === 0)
+          return (
+            <div key={it.number} className="trace-iteration">
+              <div className="iter-header">{header}</div>
+            </div>
+          );
+        return (
+          <details key={it.number} open className="trace-iteration">
+            <summary>{header}</summary>
+            {it.values.length > 0 && (
+              <section className="iter-section">
+                <h4>Values</h4>
+                {it.values.map((v) => (
+                  <ValueCard key={v.value.ptr} record={v} iteration={it.number} target={target} onOpen={onOpen} />
+                ))}
+              </section>
+            )}
+            {it.replacements.length > 0 && (
+              <section className="iter-section">
+                <h4>Replacements</h4>
+                {it.replacements.map((r, i) => (
+                  <ReplacementRow key={`${r.old.ptr}-${i}`} record={r} iteration={it.number} target={target} onOpen={onOpen} />
+                ))}
+              </section>
+            )}
+          </details>
+        );
+      })}
     </div>
   );
 }

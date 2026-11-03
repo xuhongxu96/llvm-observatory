@@ -86,6 +86,7 @@ export const HELP: HelpSection[] = [
     text: [
       "The source shows how each condition turned out, in a small badge after it: **T** for true, **F** for false, **T/F** if it went both ways, **–** if it was never checked. After a condition with `&&` or `||`, the badge **→ T** or **→ F** is the result of the whole condition. Hover a badge for the details.",
       "The tabs at the top choose which run of the code you see: **visit 1** is just the work on one instruction, **iteration 1** a whole pass over the function, **whole run** everything.",
+      "Each iteration's **coverage** button lists the LLVM files it ran, with how many conditions it checked in each. Pick one to see its badges.",
     ],
     picture: {
       label: "In simplifyAddInst, for x + 0",

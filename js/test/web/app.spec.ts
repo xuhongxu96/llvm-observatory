@@ -147,7 +147,7 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(page.locator(".source-status")).toContainText("evaluated in iteration 1", { timeout: 60_000 });
 
   // The iteration's overview lists the sources it evaluated conditions in.
-  await page.getByRole("button", { name: "conditions" }).first().click();
+  await page.getByRole("button", { name: "coverage" }).first().click();
   await expect(page.getByRole("button", { name: "lib/Analysis/InstructionSimplify.cpp" })).toBeVisible({ timeout: 60_000 });
 });
 

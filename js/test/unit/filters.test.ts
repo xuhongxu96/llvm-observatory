@@ -6,8 +6,12 @@ const counts = (filters: Partial<typeof NO_FILTERS>) =>
   filterIterations(TRACE.iterations, { ...NO_FILTERS, ...filters }).map((it) => [it.number, it.values.length, it.replacements.length]);
 
 describe("filterIterations", () => {
-  it("drops empty iterations", () => {
-    expect(counts({})).toEqual([[1, 2, 1]]);
+  it("keeps every iteration without filters, also one that changed nothing", () => {
+    expect(counts({})).toEqual([[1, 2, 1], [2, 0, 0]]);
+  });
+
+  it("drops iterations with nothing left after filtering", () => {
+    expect(counts({ opcode: "shl" })).toEqual([[1, 1, 0]]);
   });
 
   it("filters by opcode, rule and IR function", () => {

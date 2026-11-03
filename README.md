@@ -124,7 +124,7 @@ in the called functions too; the breadcrumb and **←** go back. The **visit / i
 / whole run** switch widens the conditions shown, along the whole breadcrumb. The trace has a structured view (filters,
 pointer links between values and replacements) and a JSON view (the trace as `--json`
 prints it; copy or download it). A rule or a stack frame
-opens its source with the MC/DC badges of that iteration; **conditions** lists the
+opens its source with the MC/DC badges of that iteration; **coverage** lists the
 sources an iteration (or a visit) evaluated conditions in. The optimized IR pane shows the whole module
 after any one iteration; the last one, the final IR, by default. **Share** copies a link that holds the IR.
 The page counts visits with [GoatCounter](https://www.goatcounter.com) (no cookies; not

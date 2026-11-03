@@ -9,10 +9,10 @@ const TARGET = { ref: "main", commit: "abc123", version: "23.0.0" };
 afterEach(cleanup);
 
 describe("StructuredTraceView", () => {
-  it("shows values and replacements of each non-empty iteration", () => {
+  it("shows values and replacements of each iteration, and one that changed nothing", () => {
     render(<StructuredTraceView iterations={TRACE.iterations} target={TARGET} onOpen={() => {}} />);
     expect(screen.getByText("Iteration 1")).toBeTruthy();
-    expect(screen.queryByText("Iteration 2")).toBeNull();
+    expect(screen.getByText("Iteration 2")).toBeTruthy(); // changed nothing: a header alone
     expect(screen.getAllByRole("button", { name: "InstCombinerImpl::visitAdd" })).toHaveLength(2);
     expect(screen.getByText("%a = add i32 %x, 0")).toBeTruthy();
   });
@@ -37,7 +37,7 @@ describe("StructuredTraceView", () => {
     expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1, visit: 1 }, path: "lib/Analysis/InstructionSimplify.cpp", line: 622 });
     const github = screen.getAllByTitle("open on GitHub")[0] as HTMLAnchorElement;
     expect(github.href).toBe("https://github.com/llvm/llvm-project/blob/abc123/llvm/lib/Analysis/InstructionSimplify.cpp#L622");
-    fireEvent.click(screen.getByText("conditions"));
+    fireEvent.click(screen.getAllByText("coverage")[0]);
     expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1 }, path: null, line: null });
     fireEvent.click(screen.getAllByRole("button", { name: "visit 2" })[0]);
     expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1, visit: 2 }, path: null, line: null });

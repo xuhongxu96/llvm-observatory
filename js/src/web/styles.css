@@ -290,7 +290,8 @@ html, body, #root { height: 100%; margin: 0; }
   border-radius: 6px;
   background: var(--bg-alt);
 }
-.trace-iteration > summary {
+.trace-iteration > summary,
+.trace-iteration > .iter-header {
   list-style: none;
   cursor: pointer;
   padding: 0.4rem 0.7rem;
@@ -308,6 +309,7 @@ html, body, #root { height: 100%; margin: 0; }
   transition: transform 0.12s;
 }
 .trace-iteration[open] > summary::before { transform: rotate(90deg); }
+.trace-iteration > .iter-header { cursor: default; padding-left: 1.45rem; }
 .iter-num { font-weight: 600; }
 .iter-counts { color: var(--muted); font-size: 0.85rem; }
 
@@ -457,7 +459,8 @@ html, body, #root { height: 100%; margin: 0; }
 
 .iter-section > * + * { margin-top: 0.4rem; }
 .iter-pass { color: var(--muted); font-size: 0.8rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.trace-iteration > summary .pane-header-button { margin-left: auto; }
+.trace-iteration > summary .pane-header-button,
+.trace-iteration > .iter-header .pane-header-button { margin-left: auto; }
 
 .toolbar .target { color: var(--muted); font-size: 0.85rem; text-decoration: none; }
 .toolbar .target:hover { color: var(--accent); }
