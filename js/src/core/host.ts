@@ -26,6 +26,7 @@ export type RawEventData =
   | { type: "visit_end"; iteration: number; visit: number }
   | { type: "value"; iteration: number; visit?: number; value: ValueInfo }
   | { type: "replace"; iteration: number; visit?: number; old: ValueInfo; new: ValueInfo }
+  | { type: "describe"; iteration: number; visit?: number; value: ValueInfo }
   | { type: "segment"; iteration: number; visit?: number; segment: number }
   | { type: "match"; iteration: number; visit?: number; file: string; line: number; column: number; matchers: MatcherRun[] };
 

@@ -25,6 +25,9 @@ void on_value(const llvm::Value *V);
 // `Old` is about to be replaced by `New` everywhere (Value::doRAUW).
 void on_replace(const llvm::Value *Old, const llvm::Value *New);
 
+// `V` is being destroyed (Value::~Value).
+void on_delete(const llvm::Value *V);
+
 // One iteration of a pass, from construction to destruction. Events are recorded only
 // inside an iteration.
 class IterationScope {

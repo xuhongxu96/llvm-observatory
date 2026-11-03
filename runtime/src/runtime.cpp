@@ -4,6 +4,8 @@
 //   visit_begin     {iteration, visit, instruction: Description}
 //   value           {iteration, visit?, value: Description}
 //   replace         {iteration, visit?, old: Description, new: Description}
+//   describe        {iteration, value: Description}: a value described as <badref> (in
+//                   no function yet), described again once inserted
 //   segment         {iteration, visit?, segment}, followed by the segment's coverage profile
 //   visit_end       {iteration, visit}
 //   match           {iteration, visit?, file, line, column, matchers: [Matcher]}: a call
@@ -87,6 +89,9 @@ struct State {
   MatchCall Call;                     // the outermost one
   int Depth = 0;                      // nesting of IterationScope; 0 = not observing
   std::set<const llvm::Value *> Seen; // values already reported in this iteration
+  // Values described as `<badref>` (in no function yet: InstCombine inserts a fold's new
+  // instruction after the visit returns), to describe again once they are inserted.
+  std::set<const llvm::Value *> Unplaced;
 };
 
 State &state() {
@@ -131,7 +136,10 @@ std::string debug_loc(const llvm::Instruction &I) {
 }
 
 void describe(Json &J, const char *Key, const llvm::Value &V) {
-  J.open(Key).field("ptr", pointer(&V)).field("ir", ir(V));
+  const std::string Text = ir(V);
+  if (Text.find("<badref>") != std::string::npos)
+    state().Unplaced.insert(&V);
+  J.open(Key).field("ptr", pointer(&V)).field("ir", Text);
   if (const auto *I = llvm::dyn_cast<llvm::Instruction>(&V)) {
     J.field("opcode", I->getOpcodeName());
     if (const llvm::BasicBlock *BB = I->getParent()) {
@@ -153,6 +161,22 @@ Json event(const char *Type) {
   if (S.Visit)
     J.field("visit", S.Visit);
   return J;
+}
+
+// Describes again the values described as <badref> that have been inserted since: a
+// `describe` event each, which updates their records.
+void describe_placed() {
+  State &S = state();
+  std::vector<const llvm::Value *> Placed;
+  for (const llvm::Value *V : S.Unplaced)
+    if (ir(*V).find("<badref>") == std::string::npos)
+      Placed.push_back(V);
+  for (const llvm::Value *V : Placed) {
+    S.Unplaced.erase(V);
+    Json J = event("describe");
+    describe(J, "value", *V);
+    host::emit(J.close().str(), /*Stack=*/false);
+  }
 }
 
 std::vector<char> profile() {
@@ -229,6 +253,14 @@ void on_value(const llvm::Value *V) {
   host::emit(J.close().str());
 }
 
+void on_delete(const llvm::Value *V) {
+  State &S = state();
+  if (S.Depth == 0)
+    return;
+  S.Unplaced.erase(V);
+  S.Seen.erase(V); // its address may be reused
+}
+
 void on_replace(const llvm::Value *Old, const llvm::Value *New) {
   if (state().Depth == 0 || !Old || !New)
     return;
@@ -249,6 +281,7 @@ IterationScope::IterationScope(const char *Pass) {
     return;
   ++S.Iteration;
   S.Seen.clear();
+  S.Unplaced.clear();
   __llvm_profile_reset_counters();
   host::emit(event("iteration_begin").field("pass", Pass).close().str());
 }
@@ -258,6 +291,8 @@ IterationScope::~IterationScope() {
   if (--S.Depth > 0)
     return;
   end_segment();
+  describe_placed();
+  S.Unplaced.clear();
   Json End = event("iteration_end");
   if (S.Module)
     End.field("ir", printed([&](llvm::raw_ostream &OS) { S.Module->print(OS, nullptr); }));
@@ -269,6 +304,7 @@ VisitScope::VisitScope(const llvm::Instruction &I) {
   if (S.Depth == 0 || S.Visit)
     return;
   end_segment(); // the iteration's code before this visit
+  describe_placed(); // what the previous visit made, inserted since
   S.Visit = ++S.Visits;
   Json J = event("visit_begin");
   describe(J, "instruction", I);

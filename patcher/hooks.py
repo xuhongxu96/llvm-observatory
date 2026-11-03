@@ -87,6 +87,14 @@ REPLACE = FunctionEntry(
     statement="llvm_obs::on_replace(this, {first_param});",
 )
 
+# A value is destroyed: the runtime no longer reads it (it describes values again once
+# they are inserted).
+DELETE = FunctionEntry(
+    name="delete",
+    candidates=("Value::~Value",),
+    statement="llvm_obs::on_delete(this);",
+)
+
 
 def iteration(pass_name: str, candidates: tuple[str, ...]) -> FunctionEntry:
     return FunctionEntry(

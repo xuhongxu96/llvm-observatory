@@ -102,6 +102,17 @@ def test_replace_hook_uses_the_first_parameter():
     assert out.count("on_replace") == 1
 
 
+def test_delete_hook_opens_the_destructor():
+    out = patch(hooks.DELETE, """
+        Value::~Value() {
+          destroyValueName();
+        }
+        Value::Value(Type *Ty, unsigned scid) {}
+        """)
+    assert "Value::~Value() { llvm_obs::on_delete(this);\n" in out
+    assert out.count("on_delete") == 1
+
+
 def test_iteration_scope_opens_the_body():
     hook = hooks.iteration("instcombine", ("InstCombinerImpl::run", "InstCombiner::run"))
     out = patch(hook, """

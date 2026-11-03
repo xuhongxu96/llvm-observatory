@@ -2,7 +2,7 @@
 import type { RawEvent, StackAddress } from "./host.ts";
 import type { Symbols } from "./symbolize.ts";
 import { sourcePath } from "./symbolize.ts";
-import type { Frame, Iteration, Site, Trace } from "./types.ts";
+import type { Frame, Iteration, Site, Trace, ValueInfo } from "./types.ts";
 
 // The observatory's own frames (runtime and hooks) say nothing about the fold.
 const isObservatoryFrame = (f: Frame) => shortName(f.function).startsWith("llvm_obs::");
@@ -40,6 +40,9 @@ export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
       case "replace":
         current?.replacements.push({ old: data.old, new: data.new, ...visitOf(data), ...observed(stack, symbols) });
         break;
+      case "describe":
+        if (current) placed(current, data.value);
+        break;
     }
   }
   return { iterations };
@@ -54,6 +57,17 @@ const MATCH_PREFIX = "llvm_obs::match_begin(), llvm_obs::match_end(".length;
 function siteOf(data: { file: string; line: number; column: number }): Site | null {
   const path = sourcePath(data.file);
   return path ? { path, line: data.line, column: data.column + MATCH_PREFIX } : null;
+}
+
+// A value recorded as `<badref>` (not in a function yet), described again once inserted:
+// its records take the new description.
+function placed(iteration: Iteration, value: ValueInfo) {
+  const update = (v: ValueInfo) => (v.ptr === value.ptr && v.ir.includes("<badref>") ? value : v);
+  for (const record of iteration.values) record.value = update(record.value);
+  for (const record of iteration.replacements) {
+    record.old = update(record.old);
+    record.new = update(record.new);
+  }
 }
 
 // The coverage segments of a run, by iteration and visit (null: between visits).

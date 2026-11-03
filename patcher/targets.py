@@ -42,6 +42,7 @@ RULES = (
     Rule(hooks.MatchHook(), MATCHING_SOURCES),
     Rule(hooks.MatcherHooks(), MATCHERS),
     Rule(hooks.REPLACE, ("lib/IR/Value.cpp",)),
+    Rule(hooks.DELETE, ("lib/IR/Value.cpp",)),
     Rule(
         hooks.iteration("instcombine", INSTCOMBINE_RUN),
         ("lib/Transforms/InstCombine/InstructionCombining.cpp",),

@@ -26,6 +26,7 @@ each on an existing line, so that line numbers do not change:
 |---|---|---|
 | value | `return X;` of functions returning a `Value`-like pointer in the observed sources (not `return replaceInstUsesWith(I, V);`: it returns the old `I`, and the replace hook records the replacement) | `return llvm_obs::observed(X);` |
 | replace | `Value::doRAUW` | `llvm_obs::on_replace(this, New);` |
+| delete | `Value::~Value` | `llvm_obs::on_delete(this);` (a fold's new instruction prints as `<badref>` until InstCombine inserts it, after the visit; the runtime describes it again then, unless it was destroyed) |
 | iteration | `InstCombinerImpl::run`, `AggressiveInstCombinePass::run` | `llvm_obs::IterationScope …;` |
 | visit | `visit(*I)` in `InstCombinerImpl::run` | `(llvm_obs::VisitScope(*I), visit(*I))` |
 | match | `match(V, P)` in the observed sources | `(llvm_obs::match_begin(), llvm_obs::match_end(match(V, P)))` |

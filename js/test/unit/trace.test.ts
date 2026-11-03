@@ -108,3 +108,26 @@ describe("visits, match calls and segments", () => {
     ]);
   });
 });
+
+describe("values described again once inserted", () => {
+  const unplaced = { ptr: "0x30", ir: "<badref> = shl i32 %x, 1", opcode: "shl" };
+  const placed = { ptr: "0x30", ir: "  %1 = shl i32 %x, 1", opcode: "shl", fn: "f", bb: "%0" };
+  const other = { ptr: "0x40", ir: "<badref> = add i32 %x, 1", opcode: "add" };
+  const trace = buildTrace(
+    [
+      { data: { type: "iteration_begin", iteration: 1, pass: "instcombine" }, stack: [] },
+      { data: { type: "value", iteration: 1, visit: 1, value: unplaced }, stack: [] },
+      { data: { type: "value", iteration: 1, visit: 1, value: other }, stack: [] },
+      { data: { type: "replace", iteration: 1, old: { ptr: "0x20", ir: "%b = mul i32 %x, 2" }, new: unplaced }, stack: [] },
+      { data: { type: "describe", iteration: 1, value: placed }, stack: [] },
+      { data: { type: "iteration_end", iteration: 1 }, stack: [] },
+    ],
+    new Map(),
+  );
+
+  it("take the new description in every record of the value", () => {
+    const [it1] = trace.iterations;
+    expect(it1.values.map((v) => v.value)).toEqual([placed, other]);
+    expect(it1.replacements[0].new).toEqual(placed);
+  });
+});
