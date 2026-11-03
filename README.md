@@ -99,6 +99,8 @@ pointer links between values and replacements) and a text view. A rule or a stac
 opens its source with the MC/DC badges of that iteration; **conditions** lists the
 sources an iteration evaluated conditions in. The optimized IR pane shows the whole module
 after any one iteration; the last one, the final IR, by default. **Share** copies a link that holds the IR.
+The page counts visits with [GoatCounter](https://www.goatcounter.com) (no cookies; not
+on localhost).
 
 ## Tests
 
