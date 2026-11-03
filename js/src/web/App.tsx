@@ -31,6 +31,10 @@ export function App() {
     setNav(start(selection.scope, placeCrumb(selection.path, selection.line)));
   }, []);
   const { status, result } = observatory;
+  // The source panel shows a run's scopes: without the run, it closes.
+  useEffect(() => {
+    if (!result) setNav(null);
+  }, [result]);
   const visits = useMemo(() => new Map(result?.trace.iterations.flatMap((it) => it.visits.map((v) => [v.number, v]))), [result]);
   const matches = useMemo(() => result?.trace.iterations.flatMap((it) => it.matches.map((m) => ({ ...m, iteration: it.number }))) ?? [], [result]);
 

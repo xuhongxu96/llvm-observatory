@@ -96,7 +96,7 @@ export function SourcePane({ nav, onNavigate, target, coverage, visit, matches, 
     <Pane title={<Breadcrumb nav={nav} onNavigate={onNavigate} />} actions={actions}>
       {files && "error" in files && <div className="trace-empty">coverage: {files.error}</div>}
       {path === null ? (
-        <SourceList files={covered?.files ?? null} onSelect={(p) => onNavigate(push(nav, placeCrumb(p, null)))} />
+        !(files && "error" in files) && <SourceList files={covered?.files ?? null} onSelect={(p) => onNavigate(push(nav, placeCrumb(p, null)))} />
       ) : (
         <SourceView
           path={path}

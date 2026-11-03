@@ -33,6 +33,14 @@ export function useObservatory(): Observatory {
   const coverageCache = useRef(new Map<string, Promise<IterationCoverage>>()); // by scope
 
   useEffect(() => {
+    // A new worker has run nothing: what the page shows of an earlier one (when the
+    // effect runs again, e.g. on a hot reload) goes, so that nothing asks it for the
+    // coverage of a run it never made.
+    setStatus({ kind: "loading" });
+    setResult(null);
+    coverageCache.current.clear();
+    for (const { reject } of pending.current.values()) reject(new Error("the observatory restarted"));
+    pending.current.clear();
     const w = new Worker(new URL("../worker/observatory.worker.ts", import.meta.url), { type: "module" });
     w.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       switch (data.type) {
