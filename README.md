@@ -15,7 +15,8 @@ and AggressiveInstCombine it shows
   or did not apply.
 
 Everything runs in WebAssembly, in the browser or in Node. The observed LLVM can be any
-commit.
+commit; the site, at <https://xuhongxu96.github.io/llvm-observatory/>, follows LLVM main.
+Its **?** opens a short guide with examples to try.
 
 ## How it works
 
@@ -128,6 +129,16 @@ sources an iteration (or a visit) evaluated conditions in. The optimized IR pane
 after any one iteration; the last one, the final IR, by default. **Share** copies a link that holds the IR.
 The page counts visits with [GoatCounter](https://www.goatcounter.com) (no cookies; not
 on localhost).
+
+## Publishing
+
+`.github/workflows/pages.yml` builds the site and deploys it to GitHub Pages (the
+repository's Pages source must be **GitHub Actions**). It runs on pushes to main, every
+Monday (to follow LLVM main), and by hand, optionally with another LLVM ref to observe.
+It runs the same scripts in the flake's dev shell, then the tests (pytest, unit, e2e)
+and `vite build`. The LLVM tools are cached until `infra_commit.txt` or the toolchain
+changes; ccache keeps the compiler outputs between runs. A first run, with no cache,
+takes a few hours on a hosted runner.
 
 ## Tests
 

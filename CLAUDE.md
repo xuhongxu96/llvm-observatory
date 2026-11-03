@@ -100,3 +100,6 @@ reported.
   runtime or driver change is incremental; a full target build takes a while.
 - The `test-mc-dc` branch holds the original MC/DC and stack-trace demo, for reference
   only.
+- The site is built and deployed by `.github/workflows/pages.yml` (LLVM main, weekly and
+  on push). Tests must not depend on line numbers of LLVM sources: they move with main.
+- The in-app guide is `js/src/web/model/help.ts`; its examples are run by the e2e test.

@@ -2,6 +2,11 @@
 // conditions, and make a share link that runs again.
 import { expect, test } from "@playwright/test";
 
+// The guide opens with the page until dismissed; it has a test of its own.
+test.beforeEach(async ({ page }, info) => {
+  if (!info.title.startsWith("the guide")) await page.addInitScript(() => localStorage.setItem("observatory-help-dismissed", "1"));
+});
+
 test("observes InstCombine and shows the conditions of an iteration", async ({ page }) => {
   await page.goto("/");
   const status = page.getByRole("status");
@@ -60,39 +65,46 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(source.locator(".view-line span", { hasText: /^getOperand$/ }).first()).toHaveCSS("color", "rgb(121, 94, 38)", {
     timeout: 30_000,
   });
+  // The rule's line (it moves with LLVM main), from the breadcrumb.
+  const crumb = page.locator(".breadcrumb [aria-current=location]");
+  const ruleCrumb = (await crumb.textContent())!;
+  expect(ruleCrumb).toMatch(/^InstCombineAddSub\.cpp:\d+$/);
+  const ruleLine = ruleCrumb.split(":")[1];
+
   // A line number opens the line on GitHub, at the observed commit.
   await page.context().route("https://github.com/**", (route) => route.fulfill({ body: "github" }));
   const [github] = await Promise.all([
     page.waitForEvent("popup"),
-    source.locator(".line-numbers", { hasText: /^1592$/ }).click(),
+    source.locator(".line-numbers", { hasText: new RegExp(`^${ruleLine}$`) }).click(),
   ]);
   expect(github.url()).toMatch(
-    /^https:\/\/github\.com\/llvm\/llvm-project\/blob\/[0-9a-f]{40}\/llvm\/lib\/Transforms\/InstCombine\/InstCombineAddSub\.cpp#L1592$/,
+    new RegExp(`^https://github\\.com/llvm/llvm-project/blob/[0-9a-f]{40}/llvm/lib/Transforms/InstCombine/InstCombineAddSub\\.cpp#L${ruleLine}$`),
   );
   await github.close();
 
-  // Ctrl/⌘+click on a call follows it to its definition (the overload with as many
-  // parameters), in the same visit; back returns.
-  const crumb = page.locator(".breadcrumb [aria-current=location]");
+  // Ctrl/⌘+click on a call follows it to its definition (where clang resolved it), in
+  // the same visit; back returns.
   await source.locator(".view-line span", { hasText: /^simplifyAddInst$/ }).first().click({ modifiers: ["ControlOrMeta"] });
   await expect(crumb).toHaveText("simplifyAddInst");
-  await expect(crumb).toHaveAttribute("title", "lib/Analysis/InstructionSimplify.cpp:661");
+  await expect(crumb).toHaveAttribute("title", /^lib\/Analysis\/InstructionSimplify\.cpp:\d+$/);
   await expect(source.locator(".view-lines")).toContainText("Value *llvm::simplifyAddInst(");
   await expect(visitTab).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".source-status")).toContainText("evaluated in visit 1", { timeout: 60_000 });
   // On to the implementation, whose match call ran in the visit: its hover shows the
   // matchers as they ran.
-  await source.locator(".view-line span", { hasText: /^simplifyAddInst$/ }).last().click({ modifiers: ["ControlOrMeta"] });
-  await expect(crumb).toHaveAttribute("title", /^lib\/Analysis\/InstructionSimplify\.cpp:5\d\d$/);
+  const wrapper = await crumb.getAttribute("title");
+  await source.locator(".view-line", { hasText: "::simplifyAddInst(Op0" }).locator("span", { hasText: /^simplifyAddInst$/ }).click({ modifiers: ["ControlOrMeta"] });
+  await expect(crumb).not.toHaveAttribute("title", wrapper!);
+  await expect(source.locator(".view-lines")).toContainText("static Value *simplifyAddInst(");
   await source.locator(".view-line", { hasText: "X + poison -> poison" }).click();
-  await page.keyboard.press("PageDown"); // down to the call, at line 608
+  await page.keyboard.press("PageDown"); // down to the call: match(Op1, m_Zero())
   const call = source.locator(".source-annotation").first();
   await expect(call).toHaveText("match");
   await call.hover();
   await expect(page.locator(".monaco-hover:not(.hidden)")).toContainText("m_Zero()  i32 0  ✓");
   await page.getByRole("button", { name: "back" }).click();
   await page.getByRole("button", { name: "back" }).click();
-  await expect(crumb).toHaveText("InstCombineAddSub.cpp:1592");
+  await expect(crumb).toHaveText(ruleCrumb);
   await expect(page.locator(".breadcrumb .ahead")).toHaveText(["simplifyAddInst", "simplifyAddInst"]);
   // The whole run's conditions, kept along further jumps.
   await page.getByRole("tab", { name: "whole run" }).click();
@@ -149,4 +161,24 @@ test("a share link carries the IR and runs it", async ({ page, context }) => {
   await page.goto(link);
   await expect(page.getByRole("status")).toHaveText("done", { timeout: 120_000 });
   await expect(page.getByText("Iteration 1", { exact: true })).toBeVisible();
+});
+
+test("the guide opens with the page, runs its examples, and can stay closed", async ({ page }) => {
+  await page.goto("/");
+  const guide = page.getByRole("dialog", { name: "How to Use LLVM Observatory" });
+  await expect(guide).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("ready", { timeout: 120_000 });
+  // An example goes into the editor and runs.
+  await guide.locator("#help-start").getByRole("button", { name: "try it" }).click();
+  await expect(guide).toBeHidden();
+  await expect(page.getByRole("status")).toHaveText("done", { timeout: 60_000 });
+  await expect(page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first()).toBeVisible();
+  // The toolbar's ? opens it again; asked to, it does not open with the page.
+  await page.getByRole("button", { name: "Help" }).click();
+  await guide.getByLabel("Don't show again").check();
+  await page.keyboard.press("Escape");
+  await expect(guide).toBeHidden();
+  await page.reload();
+  await expect(page.getByRole("status")).toHaveText("ready", { timeout: 120_000 });
+  await expect(guide).toBeHidden();
 });

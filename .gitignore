@@ -7,3 +7,4 @@ node_modules/
 /js/test-results/
 /js/playwright-report/
 /build-*/
+/.ccache/

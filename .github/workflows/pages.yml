@@ -1,0 +1,123 @@
+# Builds the site and publishes it to GitHub Pages: the wasm LLVM tools (from the infra
+# LLVM, cached until infra_commit.txt or the toolchain changes), the observed driver
+# (from LLVM main, see target_commit.txt), and the web app. Everything runs in the flake's
+# dev shell, as locally.
+#
+# It runs on pushes to main, every Monday (to follow LLVM main), and by hand, with
+# another LLVM ref to observe if wanted. The repository's Pages source must be set to
+# "GitHub Actions".
+name: pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "LLVM ref to observe (commit, tag or branch; empty: target_commit.txt)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # A newer run replaces one still building.
+    concurrency:
+      group: pages-build
+      cancel-in-progress: true
+    timeout-minutes: 355
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 5G
+      CCACHE_COMPRESS: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Two LLVM trees, their builds and the toolchain do not fit the runner's free disk.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Toolchain (the flake's dev shell)
+        run: nix develop -c bash -c 'emcc --version | head -n1 && node --version'
+
+      # Compiler outputs of earlier runs: LLVM main changes a little each week. Restored
+      # and saved by hand, so that a build cut short by the time limit still saves them.
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-${{ github.run_id }}
+          restore-keys: ccache-
+
+      - name: Restore LLVM tools
+        id: tools
+        uses: actions/cache@v4
+        with:
+          path: build/dist/llvm-tools
+          key: llvm-tools-${{ hashFiles('infra_commit.txt', 'flake.lock', 'scripts/build_tools.sh', 'scripts/lib.sh') }}
+
+      - name: Build LLVM tools (llvm-cov, llvm-profdata, llvm-symbolizer)
+        if: steps.tools.outputs.cache-hit != 'true'
+        timeout-minutes: 150
+        run: |
+          nix develop -c bash -c 'scripts/prepare_infra.sh && scripts/build_tools.sh'
+          rm -rf build/infra-host build/infra-wasm
+
+      - name: Patch the target LLVM
+        env:
+          TARGET_REF: ${{ inputs.target }}
+        run: nix develop -c bash -c 'uv sync && scripts/prepare_target.sh "$TARGET_REF"'
+
+      - name: Build the driver
+        timeout-minutes: 240
+        run: nix develop -c scripts/build_driver.sh
+
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-${{ github.run_id }}
+
+      - name: Test
+        run: |
+          nix develop -c bash -c '
+            set -e
+            uv run pytest -q
+            cd js
+            npm ci --no-audit --no-fund
+            npx tsc --noEmit
+            npm test
+            npm run test:e2e'
+
+      - name: Build the web app
+        run: nix develop -c bash -c 'cd js && npx vite build'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: js/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # A deployment is never cut short.
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
