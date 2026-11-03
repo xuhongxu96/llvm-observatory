@@ -34,9 +34,9 @@ export interface Run {
   profiles: ProfileStore; // by segment
 }
 
-// Whose coverage: an iteration's, or one visit's in it.
+// Whose coverage: one visit's, one iteration's, or (neither) the whole run's.
 export interface CoverageScope {
-  iteration: number;
+  iteration?: number;
   visit?: number;
 }
 
@@ -67,10 +67,12 @@ export class Observatory {
     };
   }
 
-  // The conditions an iteration, or one visit in it, evaluated: its segments merged.
+  // The conditions a scope evaluated: its segments merged.
   async coverage(run: Run, scope: CoverageScope): Promise<IterationCoverage> {
     const segments = run.segments.filter(
-      (s) => s.iteration === scope.iteration && (scope.visit === undefined || s.visit === scope.visit),
+      (s) =>
+        (scope.iteration === undefined || s.iteration === scope.iteration) &&
+        (scope.visit === undefined || s.visit === scope.visit),
     );
     if (segments.length === 0) throw new Error(`no coverage for ${describeScope(scope)}`);
     this.coverageModule ??= withoutDebugInfo(this.driver.binary);
@@ -79,4 +81,4 @@ export class Observatory {
 }
 
 export const describeScope = (scope: CoverageScope) =>
-  scope.visit === undefined ? `iteration ${scope.iteration}` : `visit ${scope.visit} of iteration ${scope.iteration}`;
+  scope.visit !== undefined ? `visit ${scope.visit}` : scope.iteration !== undefined ? `iteration ${scope.iteration}` : "the run";

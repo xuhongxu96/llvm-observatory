@@ -142,6 +142,9 @@ html, body, #root { height: 100%; margin: 0; }
 }
 .pane-title { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pane-header-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
   padding: 0.1rem 0.5rem;
   font: inherit;
   font-size: 0.75rem;
@@ -170,6 +173,7 @@ html, body, #root { height: 100%; margin: 0; }
 .pane-body { flex: 1; min-height: 0; overflow: hidden; }
 
 .view-mode-toggle {
+  flex-shrink: 0;
   display: inline-flex;
   gap: 0;
 }
@@ -470,6 +474,7 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .source-editor.linked .margin .line-numbers { cursor: pointer; }
 .source-editor.linked .margin .line-numbers:hover { color: var(--accent); text-decoration: underline; }
 .source-line-hit { background: var(--hit); }
+.source-followable { text-decoration: underline; color: var(--accent) !important; cursor: pointer; }
 .source-line-current { background: var(--accent-bg); }
 .badge {
   display: inline-block;
@@ -492,3 +497,12 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .source-list td:not(:first-child), .source-list th:not(:first-child) { text-align: right; width: 6rem; }
 .source-list button.link { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
+
+/* The source panel's navigation. */
+.breadcrumb { display: flex; align-items: center; gap: 0.25rem; min-width: 0; overflow-x: auto; white-space: nowrap; }
+.breadcrumb .crumb { display: inline-flex; align-items: center; gap: 0.25rem; }
+.breadcrumb .crumb-separator { color: var(--muted); }
+.breadcrumb button.link { font-size: 0.8rem; }
+.breadcrumb button.link.current { font-weight: 600; color: inherit; }
+.breadcrumb button.link.ahead { opacity: 0.55; }
+.source-status .alternatives button.link { margin-left: 0.4rem; font-size: inherit; }

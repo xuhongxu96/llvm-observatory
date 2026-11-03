@@ -1,11 +1,13 @@
 // An observed source in a read-only editor: C++ highlighting (src/web/monaco/cpp.ts), the
 // MC/DC badges of the iteration after their conditions (hover one for its test vectors),
-// the current line and the lines that evaluated conditions marked, and line numbers that
-// open the line on GitHub.
+// the current line and the lines that evaluated conditions marked, line numbers that
+// open the line on GitHub, and Ctrl/⌘+click or F12 on a name to follow it (to its
+// definition).
 import MonacoEditor, { type OnMount } from "@monaco-editor/react";
 import type * as monacoApi from "monaco-editor";
 import { useEffect, useRef, useState } from "react";
 import type { TargetInfo } from "../../core/observatory.ts";
+import { callArguments } from "../../core/tags.ts";
 import { useMonacoTheme } from "../hooks/useColorScheme.ts";
 import type { Badge, SourceMarks } from "../model/badges.ts";
 import { githubUrl } from "../model/github.ts";
@@ -21,9 +23,10 @@ interface Props {
   marks: SourceMarks | null;
   line: number | null; // the current line, revealed
   target: TargetInfo | null;
+  onFollow(name: string, args: number | null): void; // args: of the call, null if not a call
 }
 
-export function SourceEditor({ path, source, marks, line, target }: Props) {
+export function SourceEditor({ path, source, marks, line, target, onFollow }: Props) {
   const theme = useMonacoTheme();
   const [mounted, setMounted] = useState<{ editor: Editor; monaco: Monaco } | null>(null);
   const decorations = useRef<monacoApi.editor.IEditorDecorationsCollection | null>(null);
@@ -33,6 +36,8 @@ export function SourceEditor({ path, source, marks, line, target }: Props) {
   const centering = useRef(false);
   const githubLine = useRef<(n: number) => string | null>(() => null);
   githubLine.current = (n) => (target ? githubUrl(target, path, n) : null);
+  const follow = useRef(onFollow);
+  follow.current = onFollow;
 
   const onMount: OnMount = (editor, monaco) => {
     decorations.current = editor.createDecorationsCollection();
@@ -41,10 +46,25 @@ export function SourceEditor({ path, source, marks, line, target }: Props) {
       if (e.scrollTopChanged && !centering.current) anchor.current = null; // the user scrolled
     });
     editor.onMouseDown((e) => {
-      if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS || !e.target.position) return;
-      const url = githubLine.current(e.target.position.lineNumber);
-      if (url) window.open(url, "_blank", "noopener");
+      const position = e.target.position;
+      if (!position) return;
+      if (e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS) {
+        const url = githubLine.current(position.lineNumber);
+        if (url) window.open(url, "_blank", "noopener");
+      } else if (e.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT && (e.event.ctrlKey || e.event.metaKey)) {
+        followAt(editor, position, follow.current);
+      }
     });
+    editor.addAction({
+      id: "observatory.followDefinition",
+      label: "Go to Definition",
+      keybindings: [monaco.KeyCode.F12],
+      run: (ed) => {
+        const position = ed.getPosition();
+        if (position) followAt(ed, position, follow.current);
+      },
+    });
+    underlineOnModifier(editor, monaco);
     setMounted({ editor, monaco });
   };
 
@@ -113,4 +133,29 @@ function badgeDecoration(monaco: Monaco, n: number, badge: Badge): monacoApi.edi
       hoverMessage: { value: ["```", badge.title, "```"].join("\n") },
     },
   };
+}
+
+
+// Follows the name at `position`, with the number of arguments if it is called.
+function followAt(editor: monacoApi.editor.ICodeEditor, position: monacoApi.IPosition, onFollow: Props["onFollow"]) {
+  const model = editor.getModel();
+  const word = model?.getWordAtPosition(position);
+  if (!model || !word) return;
+  const end = model.getOffsetAt({ lineNumber: position.lineNumber, column: word.endColumn });
+  onFollow(word.word, callArguments(model.getValue(), end));
+}
+
+// Underlines the word under the mouse while Ctrl/⌘ is held: it can be followed.
+function underlineOnModifier(editor: Editor, monaco: Monaco) {
+  const underline = editor.createDecorationsCollection();
+  editor.onMouseMove((e) => {
+    const position = e.target.position;
+    const word = position && (e.event.ctrlKey || e.event.metaKey) ? editor.getModel()?.getWordAtPosition(position) : null;
+    underline.set(
+      word && position && e.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT
+        ? [{ range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn), options: { inlineClassName: "source-followable" } }]
+        : [],
+    );
+  });
+  editor.onMouseLeave(() => underline.clear());
 }

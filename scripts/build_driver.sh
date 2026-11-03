@@ -2,6 +2,7 @@
 # Builds the observed driver from the patched target LLVM into build/dist/:
 #   driver/    observatory_driver.{js,wasm}
 #   sources/   the observed sources as compiled (patched), by path under llvm/
+#   tags.json  the sources' functions and types (scripts/tags.py)
 #   target.json  {ref, commit, version}
 # Run scripts/prepare_target.sh first.
 source "$(dirname "$0")/lib.sh"
@@ -48,6 +49,9 @@ for file in \
   if [ -f "$file" ]; then cp --parents "$file" "$DIST/sources/"; fi
 done
 cd "$ROOT"
+
+# The functions defined and declared in the sources (jump to definition).
+uv run python scripts/tags.py "$DIST/sources" "$DIST/tags.json"
 
 cat > "$DIST/target.json" <<JSON
 {"ref": "$(cat "$TARGET/.observatory-ref")", "commit": "$(git -C "$TARGET" rev-parse HEAD)", "version": "$(llvm_version "$TARGET")"}

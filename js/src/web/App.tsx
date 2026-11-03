@@ -6,6 +6,7 @@ import { OutputIrPanel } from "./components/OutputIrPanel.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { CopyButton, Pane } from "./components/Pane.tsx";
 import type { SourceSelection } from "./components/SourceLocation.tsx";
+import { placeCrumb, start, type Navigation } from "./model/navigation.ts";
 import { SourcePane } from "./components/SourcePane.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
 import { TracePanel } from "./components/TracePanel.tsx";
@@ -23,13 +24,17 @@ define i32 @f(i32 %x) {
 export function App() {
   const observatory = useObservatory();
   const shared = useSharedIr(DEFAULT_IR);
-  const [selection, setSelection] = useState<SourceSelection | null>(null);
+  const [nav, setNav] = useState<Navigation | null>(null);
+  // The trace opens a source with the scope of a record: a new breadcrumb.
+  const openSource = useCallback((selection: SourceSelection) => {
+    setNav(start(selection.scope, placeCrumb(selection.path, selection.line)));
+  }, []);
   const { status, result } = observatory;
   const visits = useMemo(() => new Map(result?.trace.iterations.flatMap((it) => it.visits.map((v) => [v.number, v]))), [result]);
 
   const canRun = !shared.decoding && (status.kind === "ready" || status.kind === "done" || status.kind === "runError");
   const run = useCallback(() => {
-    setSelection(null);
+    setNav(null);
     observatory.run(shared.ir);
   }, [observatory, shared.ir]);
 
@@ -65,20 +70,20 @@ export function App() {
             <PanelGroup direction="vertical" autoSaveId="observatory-right">
               {/* id and order: the source panel comes and goes. */}
               <Panel id="trace" order={1} minSize={15}>
-                <TracePanel trace={result?.trace ?? null} target={observatory.target} onOpen={setSelection} />
+                <TracePanel trace={result?.trace ?? null} target={observatory.target} onOpen={openSource} />
               </Panel>
-              {selection && (
+              {nav && (
                 <>
                   <PanelResizeHandle className="pane-resize-handle horizontal" />
                   <Panel id="source" order={2} defaultSize={45} minSize={15}>
-                    <ErrorBoundary key={`${selection.scope.iteration}:${selection.scope.visit}:${selection.path}`}>
+                    <ErrorBoundary key={`${nav.level}:${nav.index}:${nav.crumbs.length}`}>
                       <SourcePane
-                        selection={selection}
+                        nav={nav}
+                        onNavigate={setNav}
                         target={observatory.target}
                         coverage={observatory.coverage}
                         visit={(n) => visits.get(n)}
-                        onOpen={setSelection}
-                        onClose={() => setSelection(null)}
+                        onClose={() => setNav(null)}
                       />
                     </ErrorBoundary>
                   </Panel>

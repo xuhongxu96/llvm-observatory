@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Patch an LLVM tree so a wasm build reports the values and replacements InstCombine makes."
 requires-python = ">=3.11"
 dependencies = [
-    "tree-sitter>=0.25",
+    # 0.26.0 crashes (segfault in QueryCursor.matches) indexing the sources (scripts/tags.py).
+    "tree-sitter>=0.25,<0.26",
     "tree-sitter-cpp>=0.23.4",
 ]
 

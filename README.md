@@ -61,7 +61,9 @@ releases need to build with today's compilers. Both trees are worktrees of the c
 patcher/         the patcher (uv run python -m patcher --llvm <tree> [--dry-run])
 runtime/         the hooks' interface (include/) and their implementation (src/)
 driver/          the observed program and its build flags
-scripts/         prepare_infra.sh, build_tools.sh, prepare_target.sh, build_driver.sh
+scripts/         prepare_infra.sh, build_tools.sh, prepare_target.sh, build_driver.sh;
+                 tags.py (the sources' functions, for jump to definition), run by
+                 build_driver.sh
 js/src/core/     driver, host, symbolizer, trace model, MC/DC decoding (shared)
 js/src/cli/      observe.ts: the Node command line
 js/src/web/      the web app (Vite + React)
@@ -101,8 +103,10 @@ npm run dev                                                # the web app, on bui
 
 In the web app, **Run** observes the IR. Each value and replacement belongs to the visit
 of the instruction InstCombine was combining (its **visit** pill); its rule and frames
-open their sources with the conditions of that visit, and **whole iteration** widens
-them to the iteration. The trace has a structured view (filters,
+open their sources with the conditions of that visit. In the source panel, Ctrl/⌘+click
+(or F12) on a call goes to its definition, keeping the visit's conditions, so they show
+in the called functions too; the breadcrumb and **←** go back. The **visit / iteration
+/ whole run** switch widens the conditions shown, along the whole breadcrumb. The trace has a structured view (filters,
 pointer links between values and replacements) and a JSON view (the trace as `--json`
 prints it; copy or download it). A rule or a stack frame
 opens its source with the MC/DC badges of that iteration; **conditions** lists the

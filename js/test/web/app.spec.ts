@@ -30,7 +30,9 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   // iteration's MC/DC badges.
   await page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first().click();
   // ... with the conditions of the visit that made the value.
-  await expect(page.locator(".pane-title", { hasText: "visit of" })).toContainText("%a = add i32 %x, 0");
+  const visitTab = page.getByRole("tab", { name: "visit 1" });
+  await expect(visitTab).toHaveAttribute("aria-selected", "true");
+  await expect(visitTab).toHaveAttribute("title", /visiting %a = add i32 %x, 0/);
   const source = page.locator(".source-editor");
   await expect(source.locator(".view-lines")).toContainText("if (Value *V = simplifyAddInst(");
   await expect(source.locator(".source-line-current")).toHaveCount(1);
@@ -42,7 +44,7 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   });
   expect(position).toBeGreaterThan(0.35);
   expect(position).toBeLessThan(0.65);
-  await expect(page.locator(".source-status")).toContainText("evaluated in this iteration", { timeout: 60_000 });
+  await expect(page.locator(".source-status")).toContainText("evaluated in visit 1", { timeout: 60_000 });
   await expect(source.locator(".badge").first()).toBeVisible();
   // Highlighted as C++ (tree-sitter semantic tokens): a method call in the theme's function color.
   await expect(source.locator(".view-line span", { hasText: /^getOperand$/ }).first()).toHaveCSS("color", "rgb(121, 94, 38)", {
@@ -58,6 +60,22 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
     /^https:\/\/github\.com\/llvm\/llvm-project\/blob\/[0-9a-f]{40}\/llvm\/lib\/Transforms\/InstCombine\/InstCombineAddSub\.cpp#L1592$/,
   );
   await github.close();
+
+  // Ctrl/⌘+click on a call follows it to its definition (the overload with as many
+  // parameters), in the same visit; back returns.
+  const crumb = page.locator(".breadcrumb [aria-current=location]");
+  await source.locator(".view-line span", { hasText: /^simplifyAddInst$/ }).first().click({ modifiers: ["ControlOrMeta"] });
+  await expect(crumb).toHaveText("simplifyAddInst");
+  await expect(crumb).toHaveAttribute("title", "lib/Analysis/InstructionSimplify.cpp:661");
+  await expect(source.locator(".view-lines")).toContainText("Value *llvm::simplifyAddInst(");
+  await expect(visitTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".source-status")).toContainText("evaluated in visit 1", { timeout: 60_000 });
+  await page.getByRole("button", { name: "back" }).click();
+  await expect(crumb).toHaveText("InstCombineAddSub.cpp:1592");
+  await expect(page.locator(".breadcrumb .ahead")).toHaveText("simplifyAddInst");
+  // The whole run's conditions, kept along further jumps.
+  await page.getByRole("tab", { name: "whole run" }).click();
+  await expect(page.locator(".source-status")).toContainText("evaluated in the run", { timeout: 60_000 });
 
   // Long source lines scroll inside the source pane; the page never gets wider.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -80,8 +98,8 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await page.getByRole("tab", { name: "structured" }).click();
 
   // From a visit's conditions to the whole iteration's.
-  await page.getByRole("button", { name: "whole iteration" }).click();
-  await expect(page.locator(".pane-title", { hasText: "Iteration 1 · " })).not.toContainText("visit of");
+  await page.getByRole("tab", { name: "iteration 1" }).click();
+  await expect(page.locator(".source-status")).toContainText("evaluated in iteration 1", { timeout: 60_000 });
 
   // The iteration's overview lists the sources it evaluated conditions in.
   await page.getByRole("button", { name: "conditions" }).first().click();

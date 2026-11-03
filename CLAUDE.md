@@ -55,6 +55,12 @@ was found the hard way:
   headers.
 - **`LLVM_ENABLE_PIC=OFF`, `LLVM_ENABLE_PLUGINS=OFF`.**
 
+`scripts/tags.py` indexes the shipped sources' functions with tree-sitter's C++ tags
+query, with a definition flag and parameter counts: jump to definition picks the
+overloads that take the call's argument count (e.g. the free `match(V, P)` among the
+matchers' `match(V)` methods). tree-sitter is pinned below 0.26: 0.26.0 segfaults in
+`QueryCursor.matches` on this run.
+
 `js/src/core/llvm-tools.ts` reopens a tool's stdout on a MEMFS file: emscripten's
 terminal passes output to JavaScript byte by byte, which made `llvm-cov export` 4x slower.
 
