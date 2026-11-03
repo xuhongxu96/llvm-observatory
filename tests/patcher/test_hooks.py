@@ -21,13 +21,29 @@ VALUE_RETURNS = hooks.ValueReturns()
 def test_wraps_returns_of_value_functions():
     out = patch(VALUE_RETURNS, """
         Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
-          if (Value *V = simplifyAddInst(I.getOperand(0)))
-            return replaceInstUsesWith(I, V);
+          if (Value *V = foldAdd(I))
+            return BinaryOperator::CreateNeg(V);
           return nullptr;
         }
         """)
-    assert "return llvm_obs::observed(replaceInstUsesWith(I, V));" in out
+    assert "return llvm_obs::observed(BinaryOperator::CreateNeg(V));" in out
     assert "return nullptr;" in out
+
+
+def test_skips_replace_inst_uses_with():
+    # It returns the replaced instruction; the replace hook records the replacement.
+    code = """
+        Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
+          if (Value *V = simplifyAddInst(I.getOperand(0)))
+            return replaceInstUsesWith(I, V);
+          if (Value *V = foldIt(I))
+            return IC.replaceInstUsesWith (I, V);
+          if (Value *V = foldOther(I))
+            return CI->use_empty() ? CI : IC->replaceInstUsesWith(*CI, V);
+          return eraseInstFromFunction(*replaceInstUsesWith(I, V));
+        }
+        """
+    assert patch(VALUE_RETURNS, code) == dedent(code)
 
 
 def test_matches_qualified_and_derived_return_types():

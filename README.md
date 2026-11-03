@@ -24,7 +24,7 @@ each on an existing line, so that line numbers do not change:
 
 | hook | where | inserted |
 |---|---|---|
-| value | `return X;` of functions returning a `Value`-like pointer in the observed sources | `return llvm_obs::observed(X);` |
+| value | `return X;` of functions returning a `Value`-like pointer in the observed sources (not `return replaceInstUsesWith(I, V);`: it returns the old `I`, and the replace hook records the replacement) | `return llvm_obs::observed(X);` |
 | replace | `Value::doRAUW` | `llvm_obs::on_replace(this, New);` |
 | iteration | `InstCombinerImpl::run`, `AggressiveInstCombinePass::run` | `llvm_obs::IterationScope …;` |
 | visit | `visit(*I)` in `InstCombinerImpl::run` | `(llvm_obs::VisitScope(*I), visit(*I))` |

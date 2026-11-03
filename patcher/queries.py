@@ -18,9 +18,14 @@ VALUE_FUNCTIONS = query(f"""
   (#match? @type "{VALUE_TYPE_HINT}"))
 """)
 
-# Returned expressions, except `return nullptr;` and braced initializers.
+# Returned values, except nullptr, braced lists, and replaceInstUsesWith(I, V) in any form
+# (IC.…, IC->…, inside eraseInstFromFunction or a conditional): it returns the old
+# instruction I, and the replacement is recorded by the replace hook.
 RETURN_VALUES = query("""
-(return_statement (_) @value (#not-eq? @value "nullptr") (#not-match? @value "^[{]"))
+(return_statement (_) @value
+  (#not-eq? @value "nullptr")
+  (#not-match? @value "^[{]")
+  (#not-match? @value "replaceInstUsesWith *[(]"))
 """)
 
 # Bodies that own their return statements: a return inside one of these, nested in an
