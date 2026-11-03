@@ -1,6 +1,8 @@
 // The guide (components/HelpDialog.tsx): short sections in plain words, each with an
-// example to try. Text marks `code` with backquotes. Every example runs without error
-// and makes the records its section talks about (test/e2e/observe.test.ts).
+// example to try. Text marks `code` with backquotes (LLVM IR if it has a %, else C++)
+// and **bold** with double stars. A picture is what the app shows, in a language to color
+// it in; [[T]] in it is a badge. Every example runs without error and makes the records
+// its section talks about (test/e2e/observe.test.ts).
 
 export interface Example {
   label: string;
@@ -11,7 +13,7 @@ export interface HelpSection {
   id: string;
   title: string;
   text: string[]; // paragraphs
-  picture?: { label: string; text: string }; // what the app shows, as text
+  picture?: { label: string; text: string; language: "llvm-ir" | "cpp" | "text" };
   example?: Example;
 }
 
@@ -54,7 +56,8 @@ export const HELP: HelpSection[] = [
     ],
     picture: {
       label: "The trace shows",
-      text: "value        i32 %x  (by visitAdd, in visit 1)\nreplacement  %a = add i32 %x, 0 → i32 %x",
+      text: "; value, made by visitAdd in visit 1\ni32 %x\n; replacement\n%a = add i32 %x, 0  ; → i32 %x",
+      language: "llvm-ir",
     },
     example: { label: "x + 0", ir: ADD_ZERO },
   },
@@ -86,7 +89,8 @@ export const HELP: HelpSection[] = [
     ],
     picture: {
       label: "In simplifyAddInst, for x + 0",
-      text: "if (match(Op1, m_Zero()))  T\n  return Op0;",
+      text: "if (match(Op1, m_Zero()))[[T]]\n  return Op0;",
+      language: "cpp",
     },
     example: { label: "x + 0", ir: ADD_ZERO },
   },
@@ -99,6 +103,7 @@ export const HELP: HelpSection[] = [
     picture: {
       label: "Hovering a match call",
       text: "m_LShr(…)  i32 %s  ✓\n├ m_Value(X)  i32 %x  ✓  X = i32 %x\n└ m_APInt(C)  i32 1  ✓  C = 1",
+      language: "text",
     },
     example: { label: "two compares", ir: TWO_COMPARES },
   },

@@ -582,6 +582,8 @@ button.trace-pill { cursor: pointer; font-size: inherit; }
 .help-pair > div { min-width: 0; }
 .help-label { margin-bottom: 0.3rem; font-size: 0.75rem; font-weight: 600; color: var(--muted); }
 .help-try-header { display: flex; justify-content: space-between; gap: 0.5rem; }
+.help-yes { color: var(--t-fg); font-weight: 600; }
+.help-no { color: var(--f-fg); font-weight: 600; }
 .help-code {
   margin: 0;
   padding: 0.5rem 0.65rem;

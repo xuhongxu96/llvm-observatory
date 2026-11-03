@@ -3,6 +3,7 @@
 // Escape, Close or a click outside closes it, and focus goes back where it was.
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { HELP, type Example, type HelpSection } from "../model/help.ts";
+import { Code } from "./Code.tsx";
 
 const DISMISSED_KEY = "observatory-help-dismissed";
 
@@ -24,13 +25,47 @@ function setHelpDismissed(dismissed: boolean) {
   }
 }
 
-// Text with `code` in backquotes and **bold** in double stars.
+// Text with `code` in backquotes (LLVM IR if it has a %, else C++) and **bold** in double
+// stars.
 function Prose({ text }: { text: string }) {
   return text.split("`").map((piece, i) =>
     i % 2 ? (
-      <code key={i}>{piece}</code>
+      <code key={i}>
+        <Code text={piece} language={piece.includes("%") ? "llvm-ir" : "cpp"} />
+      </code>
     ) : (
-      <Fragment key={i}>{piece.split("**").map((part, j) => (j % 2 ? <b key={j}>{part}</b> : part))}</Fragment>
+      <Fragment key={i}>{piece.split("**").map((part, j) => (j % 2 ? <Bold key={j} text={part} /> : part))}</Fragment>
+    ),
+  );
+}
+
+// The badges of the source view, drawn as there: T, F, T/F (both), – (not evaluated),
+// and → T / → F (the outcome of a decision).
+const BADGES: Record<string, string> = { T: "T", F: "F", "T/F": "M", "–": "none", "→ T": "result", "→ F": "result" };
+
+function Bold({ text }: { text: string }) {
+  return text in BADGES ? <span className={`badge ${BADGES[text]}`}>{text}</span> : <b>{text}</b>;
+}
+
+// What the app shows: code with [[T]] badges, or a matcher tree with its ✓ and ✗.
+function Picture({ text, language }: NonNullable<HelpSection["picture"]>) {
+  if (language === "text")
+    return text.split(/([✓✗])/).map((piece, i) =>
+      piece === "✓" || piece === "✗" ? (
+        <span key={i} className={piece === "✓" ? "help-yes" : "help-no"}>
+          {piece}
+        </span>
+      ) : (
+        piece
+      ),
+    );
+  return text.split(/\[\[(\w+)\]\]/).map((piece, i) =>
+    i % 2 ? (
+      <span key={i} className={`badge ${piece}`}>
+        {piece}
+      </span>
+    ) : (
+      <Code key={i} text={piece} language={language} />
     ),
   );
 }
@@ -48,7 +83,9 @@ function Section({ section, onTry }: { section: HelpSection; onTry(example: Exam
         {section.picture && (
           <div>
             <div className="help-label">{section.picture.label}</div>
-            <pre className="help-code">{section.picture.text}</pre>
+            <pre className="help-code">
+              <Picture {...section.picture} />
+            </pre>
           </div>
         )}
         {section.example && (
@@ -59,7 +96,9 @@ function Section({ section, onTry }: { section: HelpSection; onTry(example: Exam
                 try it
               </button>
             </div>
-            <pre className="help-code">{section.example.ir.trimEnd()}</pre>
+            <pre className="help-code">
+              <Code text={section.example.ir.trimEnd()} language="llvm-ir" />
+            </pre>
           </div>
         )}
       </div>

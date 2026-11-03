@@ -9,7 +9,7 @@ export const THEME = { light: "observatory-light", dark: "observatory-dark" } as
 
 // token -> [light, dark] foreground; the C++ categories are the source view's semantic
 // token types (src/web/model/highlight.ts).
-const COLORS: Record<string, [string, string]> = {
+export const COLORS: Record<string, [string, string]> = {
   keyword: ["0000FF", "569CD6"],
   type: ["267F99", "4EC9B0"],
   function: ["795E26", "DCDCAA"],

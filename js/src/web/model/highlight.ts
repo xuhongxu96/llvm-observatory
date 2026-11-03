@@ -20,14 +20,33 @@ export function categoryOf(captureName: string): number {
   return CATEGORIES.indexOf(captureName.split(".")[0]);
 }
 
-// Monaco's semantic token encoding: five numbers per token (line delta, start delta,
-// length, type, modifiers), tokens in order and within one line. Where captures overlap,
-// the innermost wins, and for the same range the later pattern (the queries put specific
-// patterns after general ones).
-export function semanticTokens(source: string, captures: Capture[]): Uint32Array {
+// The category of each character (-1: plain). Where captures overlap, the innermost
+// wins, and for the same range the later pattern (the queries put specific patterns
+// after general ones).
+function categories(source: string, captures: Capture[]): Int8Array {
   const category = new Int8Array(source.length).fill(-1);
   const ordered = [...captures].sort((a, b) => b.end - b.start - (a.end - a.start) || a.pattern - b.pattern);
   for (const c of ordered) category.fill(categoryOf(c.name), c.start, Math.min(c.end, source.length));
+  return category;
+}
+
+// The source in runs of one category (null: plain), for code shown outside an editor.
+export function categoryRuns(source: string, captures: Capture[]): { text: string; category: string | null }[] {
+  const category = categories(source, captures);
+  const runs: { text: string; category: string | null }[] = [];
+  for (let i = 0; i < source.length; ) {
+    let end = i + 1;
+    while (end < source.length && category[end] === category[i]) end++;
+    runs.push({ text: source.slice(i, end), category: category[i] >= 0 ? CATEGORIES[category[i]] : null });
+    i = end;
+  }
+  return runs;
+}
+
+// Monaco's semantic token encoding: five numbers per token (line delta, start delta,
+// length, type, modifiers), tokens in order and within one line.
+export function semanticTokens(source: string, captures: Capture[]): Uint32Array {
+  const category = categories(source, captures);
 
   const data: number[] = [];
   let line = 0;

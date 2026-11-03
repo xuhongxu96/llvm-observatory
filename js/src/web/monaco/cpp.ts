@@ -7,7 +7,7 @@ import cppHighlights from "tree-sitter-cpp/queries/highlights.scm?raw";
 import cppWasm from "tree-sitter-cpp/tree-sitter-cpp.wasm?url";
 import { Language, Parser, Query } from "web-tree-sitter";
 import parserWasm from "web-tree-sitter/web-tree-sitter.wasm?url";
-import { CATEGORIES, semanticTokens } from "../model/highlight.ts";
+import { CATEGORIES, categoryRuns, semanticTokens, type Capture } from "../model/highlight.ts";
 
 type Monaco = typeof monacoApi;
 
@@ -31,22 +31,27 @@ function loadHighlighter(): Promise<Highlighter> {
   return highlighter;
 }
 
-async function tokens(source: string): Promise<Uint32Array> {
+async function captures(source: string): Promise<Capture[]> {
   const { parser, query } = await loadHighlighter();
   const tree = parser.parse(source);
   if (!tree) throw new Error("cannot parse");
   try {
-    const captures = query.captures(tree.rootNode).map((c) => ({
+    return query.captures(tree.rootNode).map((c) => ({
       start: c.node.startIndex,
       end: c.node.endIndex,
       name: c.name,
       pattern: c.patternIndex,
     }));
-    return semanticTokens(source, captures);
   } finally {
     tree.delete();
   }
 }
+
+const tokens = async (source: string) => semanticTokens(source, await captures(source));
+
+// C++ in runs of one highlight category, as the source view colors it (for code shown
+// outside an editor).
+export const cppRuns = async (source: string) => categoryRuns(source, await captures(source));
 
 export function registerCppHighlighting(monaco: Monaco): void {
   monaco.languages.registerDocumentSemanticTokensProvider(CPP, {

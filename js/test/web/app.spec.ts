@@ -11,6 +11,8 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await page.goto("/");
   const status = page.getByRole("status");
   await expect(status).toHaveText("ready", { timeout: 120_000 });
+  // The observed LLVM by version and commit, never by branch (main moves on).
+  await expect(page.locator(".toolbar .target")).toHaveText(/^LLVM \d+\.\d+\.\d+ · [0-9a-f]{12}$/);
 
   await page.getByRole("button", { name: "Run" }).click();
   await expect(status).toHaveText("done", { timeout: 60_000 });

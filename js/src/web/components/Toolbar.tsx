@@ -45,8 +45,15 @@ export function Toolbar({ status, target, canRun, onRun, shareUrl, onHelp }: Pro
       </button>
       <IconLink href={PROJECT_URL} label="Open the GitHub repository in a new tab" path={GITHUB_ICON} />
       {target && (
-        <a className="target" href={githubCommitUrl(target)} target="_blank" rel="noopener noreferrer" title={target.commit}>
-          LLVM {target.version} · {target.ref === target.commit ? target.commit.slice(0, 12) : target.ref}
+        // The version and commit, never a branch name: a branch (e.g. main) moves on.
+        <a
+          className="target"
+          href={githubCommitUrl(target)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`${target.commit}${target.ref === target.commit ? "" : ` (built from ${target.ref})`}`}
+        >
+          LLVM {target.version} · {target.commit.slice(0, 12)}
         </a>
       )}
       <span className={`status ${status.kind}`} role="status">
