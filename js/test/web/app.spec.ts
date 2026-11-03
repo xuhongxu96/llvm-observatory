@@ -13,6 +13,12 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first()).toBeVisible();
   await expect(page.getByText("Optimized IR")).toBeVisible();
 
+  // The optimized IR after one iteration: the module as the next pass gets it.
+  const picker = page.getByLabel("IR after");
+  await expect(picker).toHaveValue("final");
+  await picker.selectOption({ label: "after iteration 1 (instcombine)" });
+  await expect(page.locator(".pane", { hasText: "Optimized IR" }).locator(".view-lines")).toContainText("shl i32 %x, 1");
+
   // Scrolled, the filter bar stays flush with the trace pane's top: nothing shows above it.
   const barOffset = await page.locator(".structured-trace").evaluate((trace) => {
     trace.scrollTop = 100;

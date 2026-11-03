@@ -18,7 +18,7 @@ const events: RawEvent[] = [
   { data: { type: "iteration_begin", iteration: 1, pass: "instcombine" }, stack: [] },
   { data: { type: "value", iteration: 1, value }, stack },
   { data: { type: "replace", iteration: 1, old: { ptr: "0x20", ir: "%a = add i32 %x, 0", opcode: "add" }, new: value }, stack },
-  { data: { type: "iteration_end", iteration: 1 }, stack: [] },
+  { data: { type: "iteration_end", iteration: 1, ir: "; module after 1" }, stack: [] },
   { data: { type: "iteration_begin", iteration: 2, pass: "aggressive-instcombine" }, stack: [] },
   { data: { type: "iteration_end", iteration: 2 }, stack: [] },
 ];
@@ -31,6 +31,10 @@ describe("buildTrace", () => {
       [1, "instcombine", 1, 1],
       [2, "aggressive-instcombine", 0, 0],
     ]);
+  });
+
+  it("keeps the module after each iteration", () => {
+    expect(trace.iterations.map((it) => it.irAfter)).toEqual(["; module after 1", ""]);
   });
 
   it("drops the observatory's frames and falls back to V8 names", () => {

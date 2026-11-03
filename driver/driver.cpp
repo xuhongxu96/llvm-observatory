@@ -77,8 +77,6 @@ bool writeModule(const llvm::Module &M) {
 } // namespace
 
 int main() {
-  llvm_obs::start_session();
-
   llvm::LLVMContext Ctx;
   llvm::SMDiagnostic Err;
   std::unique_ptr<llvm::Module> M = llvm::parseIRFile(InputPath, Err, Ctx);
@@ -86,6 +84,7 @@ int main() {
     Err.print("driver", llvm::errs());
     return 1;
   }
+  llvm_obs::start_session(*M);
   runPasses(*M);
   return writeModule(*M) ? 0 : 1;
 }

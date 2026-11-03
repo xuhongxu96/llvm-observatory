@@ -16,10 +16,11 @@ export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
   for (const { data, stack } of events) {
     switch (data.type) {
       case "iteration_begin":
-        current = { number: data.iteration, pass: data.pass, values: [], replacements: [] };
+        current = { number: data.iteration, pass: data.pass, values: [], replacements: [], irAfter: "" };
         iterations.push(current);
         break;
       case "iteration_end":
+        if (current) current.irAfter = data.ir ?? "";
         current = null;
         break;
       case "value":

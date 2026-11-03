@@ -1,7 +1,8 @@
 // The app: IR in (left), the trace and the evaluated conditions out (right).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { IrEditor, OutputIr } from "./components/IrEditor.tsx";
+import { IrEditor } from "./components/IrEditor.tsx";
+import { OutputIrPanel } from "./components/OutputIrPanel.tsx";
 import { CopyButton, Pane } from "./components/Pane.tsx";
 import type { SourceSelection } from "./components/SourceLocation.tsx";
 import { SourcePane } from "./components/SourcePane.tsx";
@@ -39,8 +40,6 @@ export function App() {
     }
   }, [canRun, run]);
 
-  const error = result && result.status !== 0 ? result.stderr || `the driver exited with status ${result.status}` : "";
-
   return (
     <div className="app">
       <Toolbar status={status} target={observatory.target} canRun={canRun} onRun={run} shareUrl={shared.shareUrl} />
@@ -55,9 +54,7 @@ export function App() {
               </Panel>
               <PanelResizeHandle className="pane-resize-handle horizontal" />
               <Panel defaultSize={40} minSize={15}>
-                <Pane title={error ? "Driver error" : "Optimized IR"} actions={<CopyButton text={error || result?.outputIr || ""} />}>
-                  <OutputIr ir={result?.outputIr ?? ""} error={error} />
-                </Pane>
+                <OutputIrPanel result={result} />
               </Panel>
             </PanelGroup>
           </Panel>

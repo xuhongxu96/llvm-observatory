@@ -3,7 +3,8 @@
 //   iteration_begin {iteration, pass}
 //   value           {iteration, value: Description}
 //   replace         {iteration, old: Description, new: Description}
-//   iteration_end   {iteration}, followed by the iteration's coverage profile
+//   iteration_end   {iteration, ir: the module after the iteration}, followed by the
+//                   iteration's coverage profile
 //
 // Description: {ptr, ir, opcode?, fn?, bb?, debug_loc?} (empty fields are omitted).
 // Events are recorded only inside an iteration: outside one, Value::doRAUW is also used
@@ -18,6 +19,7 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -35,6 +37,7 @@ namespace llvm_obs {
 namespace {
 
 struct State {
+  const llvm::Module *Module = nullptr; // the module under observation
   long Iteration = 0;                 // 1-based number of the current or last iteration
   int Depth = 0;                      // nesting of IterationScope; 0 = not observing
   std::set<const llvm::Value *> Seen; // values already reported in this iteration
@@ -129,7 +132,10 @@ void on_replace(const llvm::Value *Old, const llvm::Value *New) {
   host::emit(J.close().str());
 }
 
-void start_session() { state() = State(); }
+void start_session(const llvm::Module &M) {
+  state() = State();
+  state().Module = &M;
+}
 
 IterationScope::IterationScope(const char *Pass) {
   State &S = state();
@@ -145,7 +151,10 @@ IterationScope::~IterationScope() {
   State &S = state();
   if (--S.Depth > 0)
     return;
-  host::emit(event("iteration_end").close().str());
+  Json End = event("iteration_end");
+  if (S.Module)
+    End.field("ir", printed([&](llvm::raw_ostream &OS) { S.Module->print(OS, nullptr); }));
+  host::emit(End.close().str());
   host::emit_profile(S.Iteration, profile());
 }
 

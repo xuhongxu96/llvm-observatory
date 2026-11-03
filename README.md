@@ -97,7 +97,8 @@ npm run dev                                                # the web app, on bui
 In the web app, **Run** observes the IR. The trace has a structured view (filters,
 pointer links between values and replacements) and a text view. A rule or a stack frame
 opens its source with the MC/DC badges of that iteration; **conditions** lists the
-sources an iteration evaluated conditions in. **Share** copies a link that holds the IR.
+sources an iteration evaluated conditions in. The optimized IR pane shows the final IR,
+or the whole module after any one iteration. **Share** copies a link that holds the IR.
 
 ## Tests
 

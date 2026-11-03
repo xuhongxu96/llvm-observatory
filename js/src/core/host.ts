@@ -18,7 +18,7 @@ export interface RawEvent {
 
 export type RawEventData =
   | { type: "iteration_begin"; iteration: number; pass: string }
-  | { type: "iteration_end"; iteration: number }
+  | { type: "iteration_end"; iteration: number; ir?: string }
   | { type: "value"; iteration: number; value: ValueInfo }
   | { type: "replace"; iteration: number; old: ValueInfo; new: ValueInfo };
 

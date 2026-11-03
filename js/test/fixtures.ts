@@ -24,7 +24,8 @@ export const TRACE: Trace = {
           rule: visitAdd,
         },
       ],
+      irAfter: "define i32 @f(i32 %x) {\n  %b = shl i32 %x, 1\n  ret i32 %b\n}\n",
     },
-    { number: 2, pass: "instcombine", values: [], replacements: [] },
+    { number: 2, pass: "instcombine", values: [], replacements: [], irAfter: "" },
   ],
 };

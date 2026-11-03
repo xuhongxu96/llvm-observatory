@@ -38,6 +38,7 @@ export interface Iteration {
   pass: string;        // "instcombine" | "aggressive-instcombine"
   values: ValueRecord[];
   replacements: Replacement[];
+  irAfter: string;     // the whole module after this iteration
 }
 
 export interface Trace {
