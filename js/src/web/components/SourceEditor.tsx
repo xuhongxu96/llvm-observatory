@@ -181,20 +181,27 @@ interface Tip {
 
 // The decorations of the marks, and the badges' titles by index (the badges' elements
 // carry their index as a class: badge-<index>).
+// The scrollbar's marks: the accent of both themes, lighter for the lines that evaluated
+// conditions.
+const RULER = { hit: "rgba(9, 105, 218, 0.55)", current: "rgba(9, 105, 218, 0.9)" };
+
 function sourceDecorations(monaco: Monaco, marks: SourceMarks | null, line: number | null) {
   const out: monacoApi.editor.IModelDeltaDecoration[] = [];
   const titles: string[] = [];
-  const wholeLine = (n: number, className: string) =>
-    out.push({ range: new monaco.Range(n, 1, n, 1), options: { isWholeLine: true, className } });
+  // Each line is also marked in the scrollbar (the overview ruler): the lines that
+  // evaluated conditions, and the current line across the whole ruler.
+  const wholeLine = (n: number, className: string, ruler: monacoApi.editor.IModelDecorationOverviewRulerOptions) =>
+    out.push({ range: new monaco.Range(n, 1, n, 1), options: { isWholeLine: true, className, overviewRuler: ruler } });
+  const { Center, Full } = monaco.editor.OverviewRulerLane;
 
   for (const [n, badges] of marks?.badges ?? []) {
-    if (n !== line) wholeLine(n, "source-line-hit");
+    if (n !== line) wholeLine(n, "source-line-hit", { color: RULER.hit, position: Center });
     for (const badge of badges) {
       out.push(badgeDecoration(monaco, n, badge, titles.length));
       titles.push(badge.title);
     }
   }
-  if (line) wholeLine(line, "source-line-current");
+  if (line) wholeLine(line, "source-line-current", { color: RULER.current, position: Full });
   return { decorations: out, titles };
 }
 
