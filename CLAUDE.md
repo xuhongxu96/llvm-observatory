@@ -17,6 +17,10 @@ layout and its commands; read it first.
   required hook matches nothing. `scripts/prepare_target.sh` resets the tree before
   patching. Old-LLVM build fixups live in `patcher/compat.py`, each behind its version
   gate.
+- **Coverage comes in segments** (`runtime/src/runtime.cpp`): each visit, and the
+  iteration's code around visits, is one; the counters are reset at the start of each,
+  so a scope's coverage is the merge of its segments. The host keeps the first profile
+  whole and the others as byte differences from it (`js/src/core/profiles.ts`).
 - **No LLVM CMake file is patched.** `driver/CMakeLists.txt` is an LLVM external
   project, configured after `llvm/lib`. It sets the observed sources' flags and the link.
 - **Targets are LLVM 8 and later.** Code for older releases is not kept. `hooks.h` stays

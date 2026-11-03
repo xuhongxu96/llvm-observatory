@@ -1,5 +1,5 @@
 // The app: IR in (left), the trace and the evaluated conditions out (right).
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { IrEditor } from "./components/IrEditor.tsx";
 import { OutputIrPanel } from "./components/OutputIrPanel.tsx";
@@ -25,6 +25,7 @@ export function App() {
   const shared = useSharedIr(DEFAULT_IR);
   const [selection, setSelection] = useState<SourceSelection | null>(null);
   const { status, result } = observatory;
+  const visits = useMemo(() => new Map(result?.trace.iterations.flatMap((it) => it.visits.map((v) => [v.number, v]))), [result]);
 
   const canRun = !shared.decoding && (status.kind === "ready" || status.kind === "done" || status.kind === "runError");
   const run = useCallback(() => {
@@ -70,11 +71,12 @@ export function App() {
                 <>
                   <PanelResizeHandle className="pane-resize-handle horizontal" />
                   <Panel id="source" order={2} defaultSize={45} minSize={15}>
-                    <ErrorBoundary key={`${selection.iteration}:${selection.path}`}>
+                    <ErrorBoundary key={`${selection.scope.iteration}:${selection.scope.visit}:${selection.path}`}>
                       <SourcePane
                         selection={selection}
                         target={observatory.target}
                         coverage={observatory.coverage}
+                        visit={(n) => visits.get(n)}
                         onOpen={setSelection}
                         onClose={() => setSelection(null)}
                       />

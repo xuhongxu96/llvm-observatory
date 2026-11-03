@@ -9,7 +9,7 @@
 //     --dist DIR      the build output (default: build/dist)
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { decisions, singleConditions, valueLabel, type IterationCoverage } from "../core/mcdc.ts";
+import { decisions, singleConditions, valueLabel, type FileCoverage } from "../core/mcdc.ts";
 import { Observatory, type Run } from "../core/observatory.ts";
 import { renderText } from "../core/text.ts";
 import { DEFAULT_DIST, localDist } from "./dist.ts";
@@ -39,9 +39,9 @@ if (run.status !== 0) {
 }
 
 const wantsCoverage = opts.mcdc || opts["mcdc-file"] !== undefined;
-const coverage = new Map<number, IterationCoverage>();
+const coverage = new Map<number, Map<string, FileCoverage>>(); // iteration -> source path -> coverage
 if (wantsCoverage) {
-  for (const it of run.trace.iterations) coverage.set(it.number, filterFiles(await observatory.coverage(run, it.number)));
+  for (const it of run.trace.iterations) coverage.set(it.number, filterFiles((await observatory.coverage(run, { iteration: it.number })).files));
 }
 
 if (opts.json) {
@@ -53,12 +53,12 @@ if (opts.json) {
   if (opts["output-ir"]) console.log(`=== output IR ===\n${run.outputIr}`);
 }
 
-function filterFiles(files: IterationCoverage): IterationCoverage {
+function filterFiles(files: Map<string, FileCoverage>): Map<string, FileCoverage> {
   const needle = opts["mcdc-file"];
   return needle ? new Map([...files].filter(([path]) => path.includes(needle))) : files;
 }
 
-async function renderCoverage(iteration: number, files: IterationCoverage): Promise<string> {
+async function renderCoverage(iteration: number, files: Map<string, FileCoverage>): Promise<string> {
   const out = [`=== conditions evaluated in iteration ${iteration} ===`];
   for (const [path, file] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
     const source = await dist.source(path);
@@ -81,7 +81,7 @@ async function renderCoverage(iteration: number, files: IterationCoverage): Prom
   return out.join("\n");
 }
 
-function toJson(run: Run, coverage: Map<number, IterationCoverage>) {
+function toJson(run: Run, coverage: Map<number, Map<string, FileCoverage>>) {
   return {
     trace: run.trace,
     outputIr: run.outputIr,

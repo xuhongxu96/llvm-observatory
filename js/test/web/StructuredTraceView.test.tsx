@@ -32,13 +32,15 @@ describe("StructuredTraceView", () => {
     const onOpen = vi.fn();
     render(<StructuredTraceView iterations={TRACE.iterations} target={TARGET} onOpen={onOpen} />);
     fireEvent.click(screen.getAllByRole("button", { name: "InstCombinerImpl::visitAdd" })[0]);
-    expect(onOpen).toHaveBeenLastCalledWith({ iteration: 1, path: "lib/Transforms/InstCombine/InstCombineAddSub.cpp", line: 1556 });
+    expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1, visit: 1 }, path: "lib/Transforms/InstCombine/InstCombineAddSub.cpp", line: 1556 });
     fireEvent.click(screen.getAllByText("InstructionSimplify.cpp:622")[0]);
-    expect(onOpen).toHaveBeenLastCalledWith({ iteration: 1, path: "lib/Analysis/InstructionSimplify.cpp", line: 622 });
+    expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1, visit: 1 }, path: "lib/Analysis/InstructionSimplify.cpp", line: 622 });
     const github = screen.getAllByTitle("open on GitHub")[0] as HTMLAnchorElement;
     expect(github.href).toBe("https://github.com/llvm/llvm-project/blob/abc123/llvm/lib/Analysis/InstructionSimplify.cpp#L622");
     fireEvent.click(screen.getByText("conditions"));
-    expect(onOpen).toHaveBeenLastCalledWith({ iteration: 1, path: null, line: null });
+    expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1 }, path: null, line: null });
+    fireEvent.click(screen.getAllByRole("button", { name: "visit 2" })[0]);
+    expect(onOpen).toHaveBeenLastCalledWith({ scope: { iteration: 1, visit: 2 }, path: null, line: null });
   });
 
   it("jumps from a pointer to the value it names", () => {

@@ -40,7 +40,7 @@ const report = {
 };
 
 describe("summarize", () => {
-  const files = summarize(report as never);
+  const { files } = summarize(report as never);
 
   it("keeps executed records of LLVM sources only", () => {
     expect([...files.keys()]).toEqual(["lib/Analysis/InstructionSimplify.cpp"]);
@@ -111,7 +111,7 @@ describe("condition text", () => {
 describe("summarize with a decision's own branch region", () => {
   it("does not repeat the decision as a plain condition", () => {
     const rec = [2, 7, 2, 51, 0, 0, 0, 0, 5, [{}, {}], [{ executed: true, result: true, conditions: [true, null] }]];
-    const files = summarize({ data: [{ functions: [{ filenames: [FILE], mcdc_records: [rec], branches: [[2, 7, 2, 51, 1, 0, 0, 0, 4]] }] }] } as never);
+    const { files } = summarize({ data: [{ functions: [{ filenames: [FILE], mcdc_records: [rec], branches: [[2, 7, 2, 51, 1, 0, 0, 0, 4]] }] }] } as never);
     expect(files.get("lib/Analysis/InstructionSimplify.cpp")!.branches).toEqual([]);
   });
 });
@@ -123,7 +123,7 @@ describe("summarize with one header function instantiated twice", () => {
     mcdc_records: [[10, 5, 10, 20, 0, 0, 0, 0, 5, [{}, {}], [{ executed: true, result, conditions: vector }]]],
     branches: [[12, 9, 12, 12, counts[0], counts[1], 0, 0, 4]],
   });
-  const files = summarize({
+  const { files } = summarize({
     data: [{ functions: [instantiation([true, true], true, [1, 0]), instantiation([false, null], false, [0, 2]), instantiation([true, true], true, [1, 0])] }],
   } as never);
   const file = files.get("include/llvm/IR/PatternMatch.h")!;

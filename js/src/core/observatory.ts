@@ -3,9 +3,10 @@
 import { Driver } from "./driver.ts";
 import type { ModuleSource } from "./emscripten.ts";
 import { LlvmTools, type ToolName } from "./llvm-tools.ts";
-import { decodeProfile, type IterationCoverage } from "./mcdc.ts";
+import { decodeProfiles, type IterationCoverage } from "./mcdc.ts";
+import type { ProfileStore } from "./profiles.ts";
 import { symbolize } from "./symbolize.ts";
-import { buildTrace, stackAddresses } from "./trace.ts";
+import { buildTrace, segmentsOf, stackAddresses, type Segment } from "./trace.ts";
 import type { Trace } from "./types.ts";
 import { withoutDebugInfo } from "./wasm.ts";
 
@@ -29,7 +30,14 @@ export interface Run {
   stderr: string;
   outputIr: string;
   trace: Trace;
-  profiles: Map<number, Uint8Array>; // iteration -> .profraw
+  segments: Segment[];
+  profiles: ProfileStore; // by segment
+}
+
+// Whose coverage: an iteration's, or one visit's in it.
+export interface CoverageScope {
+  iteration: number;
+  visit?: number;
 }
 
 export class Observatory {
@@ -54,15 +62,21 @@ export class Observatory {
       stderr: raw.stderr,
       outputIr: raw.outputIr,
       trace: buildTrace(raw.events, symbols),
+      segments: segmentsOf(raw.events),
       profiles: raw.profiles,
     };
   }
 
-  // The conditions one iteration evaluated (the iteration must have a profile).
-  async coverage(run: Run, iteration: number): Promise<IterationCoverage> {
-    const profile = run.profiles.get(iteration);
-    if (!profile) throw new Error(`no coverage profile for iteration ${iteration}`);
+  // The conditions an iteration, or one visit in it, evaluated: its segments merged.
+  async coverage(run: Run, scope: CoverageScope): Promise<IterationCoverage> {
+    const segments = run.segments.filter(
+      (s) => s.iteration === scope.iteration && (scope.visit === undefined || s.visit === scope.visit),
+    );
+    if (segments.length === 0) throw new Error(`no coverage for ${describeScope(scope)}`);
     this.coverageModule ??= withoutDebugInfo(this.driver.binary);
-    return decodeProfile(this.tools, this.coverageModule, profile);
+    return decodeProfiles(this.tools, this.coverageModule, segments.map((s) => run.profiles.get(s.segment)));
   }
 }
+
+export const describeScope = (scope: CoverageScope) =>
+  scope.visit === undefined ? `iteration ${scope.iteration}` : `visit ${scope.visit} of iteration ${scope.iteration}`;

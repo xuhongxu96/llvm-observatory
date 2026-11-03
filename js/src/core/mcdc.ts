@@ -53,16 +53,19 @@ export interface FileCoverage {
   branches: TakenBranch[];
 }
 
-export type IterationCoverage = Map<string, FileCoverage>; // source path -> coverage
+export interface IterationCoverage {
+  files: Map<string, FileCoverage>; // source path -> coverage
+}
 
 const BRANCH_REGION = 4; // llvm::coverage::CounterMappingRegion::BranchRegion
 
-// Decodes the .profraw of an iteration against the module that wrote it.
-export async function decodeProfile(tools: LlvmTools, binary: Uint8Array, profraw: Uint8Array): Promise<IterationCoverage> {
+// Decodes .profraw profiles, merged (counters add up), against the module that wrote them.
+export async function decodeProfiles(tools: LlvmTools, binary: Uint8Array, profraws: Uint8Array[]): Promise<IterationCoverage> {
+  const inputs = Object.fromEntries(profraws.map((p, i) => [`p${i}.profraw`, p]));
   const merged = await tools.run(
     "llvm-profdata",
-    ["merge", "-o", "/work/run.profdata", "/work/run.profraw"],
-    { "run.profraw": profraw },
+    ["merge", "-o", "/work/run.profdata", ...Object.keys(inputs).map((name) => `/work/${name}`)],
+    inputs,
     ["run.profdata"],
   );
   const cov = await tools.run(
@@ -107,7 +110,7 @@ export function summarize(report: CoverageExport): IterationCoverage {
     }
   }
 
-  const files: IterationCoverage = new Map();
+  const files = new Map<string, FileCoverage>();
   const fileAt = (path: string) => {
     let file = files.get(path);
     if (!file) files.set(path, (file = { decisions: [], branches: [] }));
@@ -118,7 +121,7 @@ export function summarize(report: CoverageExport): IterationCoverage {
     // A decision's own branch region would repeat it as a plain condition.
     if (!decisions.has(key)) fileAt(path).branches.push(b);
   }
-  return files;
+  return { files };
 }
 
 const regionKey = (path: string, rec: number[] | McdcRecord) => `${path}:${rec.slice(0, 4).join(":")}`;

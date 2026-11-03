@@ -34,8 +34,8 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     case "coverage":
       await answer(data.id, async () => {
         if (!lastRun) throw new Error("nothing has run yet");
-        const files = await ready().coverage(lastRun, data.iteration);
-        post({ type: "coverage", id: data.id, iteration: data.iteration, files: [...files] });
+        const coverage = await ready().coverage(lastRun, data.scope);
+        post({ type: "coverage", id: data.id, coverage });
       });
       break;
   }

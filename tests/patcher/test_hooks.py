@@ -96,6 +96,23 @@ def test_iteration_scope_opens_the_body():
     assert 'bool InstCombiner::run() { llvm_obs::IterationScope llvm_obs_iteration("instcombine");' in out
 
 
+def test_visit_scope_wraps_the_visit_call():
+    hook = hooks.VisitScopeHook(("InstCombinerImpl::run", "InstCombiner::run"))
+    out = patch(hook, """
+        bool InstCombinerImpl::run() {
+          while (!Worklist.isEmpty()) {
+            if (Instruction *Result = visit(*I)) {
+              Worklist.add(Result);
+            }
+          }
+          return visitor.visit(*J);
+        }
+        void other() { visit(*I); }
+        """)
+    assert "if (Instruction *Result = (llvm_obs::VisitScope(*I), visit(*I))) {" in out
+    assert out.count("VisitScope") == 1  # not member calls, nor other functions
+
+
 def test_no_match_gives_no_points():
     hook = hooks.iteration("instcombine", ("InstCombinerImpl::run",))
     src = SourceFile(Path("t.cpp"), b"void InstCombinePass::run() {}")

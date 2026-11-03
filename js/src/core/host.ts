@@ -1,7 +1,8 @@
 // The JavaScript side of runtime/src/host.cpp. The driver module calls
 // `observatory.emit` for every event, while the event's wasm frames are live, so the
-// stack is captured here; and `observatory.emitProfile` at the end of each iteration.
+// stack is captured here; and `observatory.emitProfile` with each coverage segment.
 
+import { ProfileStore } from "./profiles.ts";
 import type { ValueInfo } from "./types.ts";
 
 // A wasm frame of a captured stack: its byte offset in the module, which is the
@@ -16,23 +17,27 @@ export interface RawEvent {
   stack: StackAddress[]; // innermost first
 }
 
+// The runtime's events (runtime/src/runtime.cpp). `visit` is set inside a visit.
 export type RawEventData =
   | { type: "iteration_begin"; iteration: number; pass: string }
   | { type: "iteration_end"; iteration: number; ir?: string }
-  | { type: "value"; iteration: number; value: ValueInfo }
-  | { type: "replace"; iteration: number; old: ValueInfo; new: ValueInfo };
+  | { type: "visit_begin"; iteration: number; visit: number; instruction: ValueInfo }
+  | { type: "visit_end"; iteration: number; visit: number }
+  | { type: "value"; iteration: number; visit?: number; value: ValueInfo }
+  | { type: "replace"; iteration: number; visit?: number; old: ValueInfo; new: ValueInfo }
+  | { type: "segment"; iteration: number; visit?: number; segment: number };
 
 export class Recorder {
   events: RawEvent[] = [];
-  profiles = new Map<number, Uint8Array>(); // iteration -> .profraw
+  profiles = new ProfileStore(); // coverage segment -> .profraw
 
   // Passed to the module factory as `observatory`.
   readonly observatory = {
     emit: (json: string) => {
       this.events.push({ data: JSON.parse(json) as RawEventData, stack: parseWasmStack(new Error().stack ?? "") });
     },
-    emitProfile: (iteration: number, profile: Uint8Array) => {
-      this.profiles.set(iteration, profile);
+    emitProfile: (segment: number, profile: Uint8Array) => {
+      this.profiles.add(segment, profile);
     },
   };
 
@@ -43,7 +48,7 @@ export class Recorder {
 
   clear(): void {
     this.events = [];
-    this.profiles = new Map();
+    this.profiles = new ProfileStore();
   }
 }
 

@@ -12,8 +12,8 @@ namespace host {
 // One event, as a JSON object.
 void emit(const std::string &Json);
 
-// The raw coverage profile (.profraw) at the end of an iteration.
-void emit_profile(long Iteration, const std::vector<char> &Profile);
+// The raw coverage profile (.profraw) of a coverage segment.
+void emit_profile(long Segment, const std::vector<char> &Profile);
 
 } // namespace host
 } // namespace llvm_obs

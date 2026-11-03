@@ -26,16 +26,25 @@ interface Observed {
 
 export interface ValueRecord extends Observed {
   value: ValueInfo;
+  visit?: number; // the visit it happened in, if any
 }
 
 export interface Replacement extends Observed {
   old: ValueInfo;
   new: ValueInfo;
+  visit?: number;
+}
+
+// One visit of an instruction by InstCombine, numbered from 1 over the run.
+export interface Visit {
+  number: number;
+  instruction: ValueInfo; // as it was when the visit began
 }
 
 export interface Iteration {
   number: number;      // 1-based, over the whole run
   pass: string;        // "instcombine" | "aggressive-instcombine"
+  visits: Visit[];
   values: ValueRecord[];
   replacements: Replacement[];
   irAfter: string;     // the whole module after this iteration

@@ -356,6 +356,7 @@ html, body, #root { height: 100%; margin: 0; }
 }
 .trace-pill.opcode { background: rgba(151, 195, 235, 0.15); border-color: #4a8fcf; color: #58a6ff; }
 .trace-pill.fn     { background: rgba(180, 144, 226, 0.15); border-color: #8c6fbb; color: #c586c0; }
+.trace-pill.visit  { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
 .trace-pill.rule   { background: rgba(245, 184, 100, 0.15); border-color: #b18043; color: #d7ba7d; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .trace-pill.dbg    { background: rgba(120, 180, 120, 0.15); border-color: #5a8a5a; color: #b5cea8; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .trace-pill-bb {

@@ -12,11 +12,11 @@ export function renderText(trace: Trace, options: TextOptions = {}): string {
     if (it.values.length === 0 && it.replacements.length === 0) continue;
     out.push(`=== iteration ${it.number}: ${it.pass} ===`);
     for (const v of it.values) {
-      out.push(`value ${describe(v.value)}${tags(v.value, v.rule)}`);
+      out.push(`value ${describe(v.value)}${tags(v.value, v.rule, v.visit)}`);
       out.push(...frameLines(v.frames, options));
     }
     for (const r of it.replacements) {
-      out.push(`replace ${describe(r.old)}  ->  ${describe(r.new)}${tags(r.old, r.rule)}`);
+      out.push(`replace ${describe(r.old)}  ->  ${describe(r.new)}${tags(r.old, r.rule, r.visit)}`);
       out.push(...frameLines(r.frames, options));
     }
     out.push("");
@@ -26,8 +26,9 @@ export function renderText(trace: Trace, options: TextOptions = {}): string {
 
 const describe = (v: ValueInfo) => `${v.ptr} \`${v.ir.trim()}\``;
 
-function tags(v: ValueInfo, rule: Frame | null): string {
+function tags(v: ValueInfo, rule: Frame | null, visit: number | undefined): string {
   const parts: string[] = [];
+  if (visit) parts.push(`visit=${visit}`);
   if (v.fn) parts.push(`fn=@${v.fn}${v.bb ? `/${v.bb}` : ""}`);
   if (v.debug_loc) parts.push(`dbg=${v.debug_loc}`);
   if (rule) parts.push(`rule=${shortName(rule.function)}`);

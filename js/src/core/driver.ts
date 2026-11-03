@@ -1,6 +1,7 @@
 // The observed driver (driver/driver.cpp): one instance, run once per input.
 import { callMain, instantiate, load, type EmscriptenModule, type ModuleSource } from "./emscripten.ts";
 import { Recorder, type RawEvent } from "./host.ts";
+import type { ProfileStore } from "./profiles.ts";
 
 const INPUT = "/work/input.ll";
 const OUTPUT = "/work/output.ll";
@@ -10,7 +11,7 @@ export interface RawRun {
   stderr: string;
   outputIr: string;               // empty when the driver failed
   events: RawEvent[];
-  profiles: Map<number, Uint8Array>; // iteration -> .profraw
+  profiles: ProfileStore; // coverage segment -> .profraw
 }
 
 export class Driver {

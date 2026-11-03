@@ -76,7 +76,7 @@ export function StructuredTraceView({ iterations, target, onOpen }: Props) {
               title="the conditions this iteration evaluated (MC/DC)"
               onClick={(e) => {
                 e.preventDefault();
-                onOpen({ iteration: it.number, path: null, line: null });
+                onOpen({ scope: { iteration: it.number }, path: null, line: null });
               }}
             >
               conditions

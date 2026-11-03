@@ -24,15 +24,18 @@ each on an existing line, so that line numbers do not change:
 | value | `return X;` of functions returning a `Value`-like pointer in the observed sources | `return llvm_obs::observed(X);` |
 | replace | `Value::doRAUW` | `llvm_obs::on_replace(this, New);` |
 | iteration | `InstCombinerImpl::run`, `AggressiveInstCombinePass::run` | `llvm_obs::IterationScope …;` |
+| visit | `visit(*I)` in `InstCombinerImpl::run` | `(llvm_obs::VisitScope(*I), visit(*I))` |
 
 Everything else comes from the toolchain:
 
 - **Stacks.** Each hook calls into JavaScript (`runtime/src/host.cpp`), which reads the
   live wasm stack from `new Error().stack`. `llvm-symbolizer` resolves it with the DWARF
   of the observed sources.
-- **Conditions.** The observed sources are compiled with `-fcoverage-mcdc`. Each
-  iteration resets the profile counters on entry and hands the raw profile to JavaScript
-  on exit. `llvm-profdata` and `llvm-cov` (also in wasm) decode it.
+- **Conditions.** The observed sources are compiled with `-fcoverage-mcdc`. The runtime
+  hands the raw profile to JavaScript per segment and resets the counters: a segment is
+  one visit of an instruction by InstCombine, or the iteration's code before, between
+  or after visits. `llvm-profdata` merges the segments of a scope (a visit, or a whole
+  iteration) and `llvm-cov` (also in wasm) decodes them.
 
 The runtime (`runtime/`) and the driver (`driver/`) are compiled into one wasm module,
 `observatory_driver`. It runs InstCombinePass and AggressiveInstCombinePass on
@@ -96,11 +99,14 @@ node src/cli/observe.ts input.ll --json > run.json
 npm run dev                                                # the web app, on build/dist
 ```
 
-In the web app, **Run** observes the IR. The trace has a structured view (filters,
+In the web app, **Run** observes the IR. Each value and replacement belongs to the visit
+of the instruction InstCombine was combining (its **visit** pill); its rule and frames
+open their sources with the conditions of that visit, and **whole iteration** widens
+them to the iteration. The trace has a structured view (filters,
 pointer links between values and replacements) and a JSON view (the trace as `--json`
 prints it; copy or download it). A rule or a stack frame
 opens its source with the MC/DC badges of that iteration; **conditions** lists the
-sources an iteration evaluated conditions in. The optimized IR pane shows the whole module
+sources an iteration (or a visit) evaluated conditions in. The optimized IR pane shows the whole module
 after any one iteration; the last one, the final IR, by default. **Share** copies a link that holds the IR.
 The page counts visits with [GoatCounter](https://www.goatcounter.com) (no cookies; not
 on localhost).

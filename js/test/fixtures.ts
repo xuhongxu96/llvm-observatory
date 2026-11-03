@@ -12,20 +12,25 @@ export const TRACE: Trace = {
     {
       number: 1,
       pass: "instcombine",
+      visits: [
+        { number: 1, instruction: { ptr: "0x20", ir: "  %a = add i32 %x, 0", opcode: "add", fn: "f", bb: "entry" } },
+        { number: 2, instruction: { ptr: "0x40", ir: "  %b = mul i32 %a, 2", opcode: "mul", fn: "f", bb: "entry" } },
+      ],
       values: [
-        { value: { ptr: "0x10", ir: "i32 %x" }, frames: [simplify, visitAdd], rule: visitAdd },
-        { value: { ptr: "0x30", ir: "  %b = shl i32 %x, 1", opcode: "shl", fn: "f", bb: "entry" }, frames: [visitMul], rule: visitMul },
+        { value: { ptr: "0x10", ir: "i32 %x" }, visit: 1, frames: [simplify, visitAdd], rule: visitAdd },
+        { value: { ptr: "0x30", ir: "  %b = shl i32 %x, 1", opcode: "shl", fn: "f", bb: "entry" }, visit: 2, frames: [visitMul], rule: visitMul },
       ],
       replacements: [
         {
           old: { ptr: "0x20", ir: "  %a = add i32 %x, 0", opcode: "add", fn: "f", bb: "entry" },
           new: { ptr: "0x10", ir: "i32 %x" },
+          visit: 1,
           frames: [visitAdd],
           rule: visitAdd,
         },
       ],
       irAfter: "define i32 @f(i32 %x) {\n  %b = shl i32 %x, 1\n  ret i32 %b\n}\n",
     },
-    { number: 2, pass: "instcombine", values: [], replacements: [], irAfter: "" },
+    { number: 2, pass: "instcombine", visits: [], values: [], replacements: [], irAfter: "" },
   ],
 };

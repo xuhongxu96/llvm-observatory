@@ -94,3 +94,34 @@ def iteration(pass_name: str, candidates: tuple[str, ...]) -> FunctionEntry:
         candidates=candidates,
         statement=f'llvm_obs::IterationScope llvm_obs_iteration("{pass_name}");',
     )
+
+
+@dataclass(frozen=True)
+class VisitScopeHook:
+    """`visit(*I)` -> `(llvm_obs::VisitScope(*I), visit(*I))` in the body of the first
+    function found among `candidates`: the temporary scope lasts as long as the visit."""
+
+    candidates: tuple[str, ...]
+    name: str = "visit"
+
+    def points(self, src: SourceFile) -> list[Point]:
+        found = {src.text(m["name"][0]).decode(): m for m in src.matches(self._functions)}
+        for candidate in self.candidates:
+            if match := found.get(candidate):
+                body = match["open"][0].parent
+                return [
+                    (
+                        Insertion(call["call"][0].start_byte, b"(llvm_obs::VisitScope(" + src.text(call["argument"][0]) + b"), "),
+                        Insertion(call["call"][0].end_byte, b")"),
+                    )
+                    for call in src.matches(self._calls, body)
+                ]
+        return []
+
+    @cached_property
+    def _functions(self) -> Query:
+        return query(queries.function_entry(self.candidates))
+
+    @cached_property
+    def _calls(self) -> Query:
+        return query(queries.calls_to("visit"))

@@ -3,7 +3,8 @@
 // Without a path, it lists the sources the iteration evaluated conditions in.
 import { useMemo } from "react";
 import type { FileCoverage, IterationCoverage } from "../../core/mcdc.ts";
-import type { TargetInfo } from "../../core/observatory.ts";
+import type { CoverageScope, TargetInfo } from "../../core/observatory.ts";
+import type { Visit } from "../../core/types.ts";
 import { useAsync } from "../hooks/useAsync.ts";
 import { useSource } from "../hooks/useSource.ts";
 import { sourceMarks } from "../model/badges.ts";
@@ -15,25 +16,38 @@ import type { OpenSource, SourceSelection } from "./SourceLocation.tsx";
 interface Props {
   selection: SourceSelection;
   target: TargetInfo | null;
-  coverage(iteration: number): Promise<IterationCoverage>;
+  coverage(scope: CoverageScope): Promise<IterationCoverage>;
+  visit(number: number): Visit | undefined; // of the current run
   onOpen: OpenSource;
   onClose(): void;
 }
 
-export function SourcePane({ selection, target, coverage, onOpen, onClose }: Props) {
-  const { iteration, path, line } = selection;
-  const files = useAsync(() => coverage(iteration), [coverage, iteration]);
+export function SourcePane({ selection, target, coverage, visit, onOpen, onClose }: Props) {
+  const { scope, path, line } = selection;
+  const files = useAsync(() => coverage(scope), [coverage, scope.iteration, scope.visit]);
   const covered = files && "value" in files ? files.value : null;
 
+  const visited = scope.visit === undefined ? undefined : visit(scope.visit);
   const title = (
-    <>
-      Iteration {iteration} · {path ?? "evaluated sources"}
-    </>
+    <span title={visited ? `the conditions evaluated while visiting ${visited.instruction.ir.trim()}` : "the conditions evaluated in the iteration"}>
+      Iteration {scope.iteration}
+      {visited && <> · visit of <code>{visited.instruction.ir.trim()}</code></>} · {path ?? "evaluated sources"}
+    </span>
   );
   const actions = (
     <>
+      {scope.visit !== undefined && (
+        <button
+          type="button"
+          className="pane-header-button"
+          title="the conditions of the whole iteration"
+          onClick={() => onOpen({ ...selection, scope: { iteration: scope.iteration } })}
+        >
+          whole iteration
+        </button>
+      )}
       {path && (
-        <button type="button" className="pane-header-button" onClick={() => onOpen({ iteration, path: null, line: null })}>
+        <button type="button" className="pane-header-button" onClick={() => onOpen({ scope, path: null, line: null })}>
           sources
         </button>
       )}
@@ -52,15 +66,21 @@ export function SourcePane({ selection, target, coverage, onOpen, onClose }: Pro
     <Pane title={title} actions={actions}>
       {files && "error" in files && <div className="trace-empty">coverage: {files.error}</div>}
       {path === null ? (
-        <SourceList files={covered} onSelect={(p) => onOpen({ iteration, path: p, line: null })} />
+        <SourceList files={covered?.files ?? null} onSelect={(p) => onOpen({ scope, path: p, line: null })} />
       ) : (
-        <SourceView path={path} line={line} file={covered?.get(path)} loading={files === undefined} target={target} />
+        <SourceView
+          path={path}
+          line={line}
+          file={covered?.files.get(path)}
+          loading={files === undefined}
+          target={target}
+        />
       )}
     </Pane>
   );
 }
 
-function SourceList({ files, onSelect }: { files: IterationCoverage | null; onSelect(path: string): void }) {
+function SourceList({ files, onSelect }: { files: IterationCoverage["files"] | null; onSelect(path: string): void }) {
   if (!files) return <div className="trace-empty">decoding the iteration's coverage…</div>;
   const rows = [...files].sort(([a], [b]) => a.localeCompare(b));
   return (

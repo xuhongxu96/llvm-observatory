@@ -28,6 +28,6 @@ describe("Recorder", () => {
     expect(recorder.profiles.get(1)).toEqual(new Uint8Array([1, 2]));
     recorder.clear();
     expect(recorder.events).toEqual([]);
-    expect(recorder.profiles.size).toBe(0);
+    expect(recorder.profiles.has(1)).toBe(false);
   });
 });

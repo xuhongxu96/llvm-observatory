@@ -44,3 +44,14 @@ def function_entry(names: tuple[str, ...]) -> str:
   body: (compound_statement "{{" @open)
   (#any-of? @name {quoted}))
 """
+
+
+def calls_to(callee: str) -> str:
+    """Query source for the calls of the function named `callee` with one argument,
+    capturing the `@call` and its `@argument`."""
+    return f"""
+(call_expression
+  function: (identifier) @callee
+  arguments: (argument_list . (_) @argument .)
+  (#eq? @callee "{callee}")) @call
+"""

@@ -17,3 +17,4 @@ entry:
 ; expect value `float 3.000000e+00`: visitFAdd, InstCombineAddSub.cpp
 ; expect mcdc lib/Analysis/InstructionSimplify.cpp: m_Zero
 ; expect mcdc include/llvm/IR/PatternMatch.h: hasOneUse
+; expect visit-mcdc `i32 %x` lib/Analysis/InstructionSimplify.cpp: m_Zero

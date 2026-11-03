@@ -29,6 +29,8 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   // The rule opens its source in a read-only editor, at the rule's line, with the
   // iteration's MC/DC badges.
   await page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first().click();
+  // ... with the conditions of the visit that made the value.
+  await expect(page.locator(".pane-title", { hasText: "visit of" })).toContainText("%a = add i32 %x, 0");
   const source = page.locator(".source-editor");
   await expect(source.locator(".view-lines")).toContainText("if (Value *V = simplifyAddInst(");
   await expect(source.locator(".source-line-current")).toHaveCount(1);
@@ -76,6 +78,10 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   const saved = JSON.parse(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString()));
   expect(saved.iterations[0].pass).toBe("instcombine");
   await page.getByRole("tab", { name: "structured" }).click();
+
+  // From a visit's conditions to the whole iteration's.
+  await page.getByRole("button", { name: "whole iteration" }).click();
+  await expect(page.locator(".pane-title", { hasText: "Iteration 1 · " })).not.toContainText("visit of");
 
   // The iteration's overview lists the sources it evaluated conditions in.
   await page.getByRole("button", { name: "conditions" }).first().click();

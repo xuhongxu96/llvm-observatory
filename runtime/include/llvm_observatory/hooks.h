@@ -11,6 +11,7 @@
 #include <utility>
 
 namespace llvm {
+class Instruction;
 class Value;
 } // namespace llvm
 
@@ -23,13 +24,23 @@ void on_value(const llvm::Value *V);
 void on_replace(const llvm::Value *Old, const llvm::Value *New);
 
 // One iteration of a pass, from construction to destruction. Events are recorded only
-// inside an iteration; the coverage profile is reset at its start and reported at its end.
+// inside an iteration.
 class IterationScope {
 public:
   explicit IterationScope(const char *Pass);
   ~IterationScope();
   IterationScope(const IterationScope &) = delete;
   IterationScope &operator=(const IterationScope &) = delete;
+};
+
+// One visit of an instruction by InstCombine: `visit(*I)` becomes
+// `(VisitScope(*I), visit(*I))`, so the temporary lives as long as the visit.
+class VisitScope {
+public:
+  explicit VisitScope(const llvm::Instruction &I);
+  ~VisitScope();
+  VisitScope(const VisitScope &) = delete;
+  VisitScope &operator=(const VisitScope &) = delete;
 };
 
 template <typename T>

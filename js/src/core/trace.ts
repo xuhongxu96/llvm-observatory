@@ -18,22 +18,40 @@ export function buildTrace(events: RawEvent[], symbols: Symbols): Trace {
   for (const { data, stack } of events) {
     switch (data.type) {
       case "iteration_begin":
-        current = { number: data.iteration, pass: data.pass, values: [], replacements: [], irAfter: "" };
+        current = { number: data.iteration, pass: data.pass, visits: [], values: [], replacements: [], irAfter: "" };
         iterations.push(current);
         break;
       case "iteration_end":
         if (current) current.irAfter = data.ir ?? "";
         current = null;
         break;
+      case "visit_begin":
+        current?.visits.push({ number: data.visit, instruction: data.instruction });
+        break;
       case "value":
-        current?.values.push({ value: data.value, ...observed(stack, symbols) });
+        current?.values.push({ value: data.value, ...visitOf(data), ...observed(stack, symbols) });
         break;
       case "replace":
-        current?.replacements.push({ old: data.old, new: data.new, ...observed(stack, symbols) });
+        current?.replacements.push({ old: data.old, new: data.new, ...visitOf(data), ...observed(stack, symbols) });
         break;
     }
   }
   return { iterations };
+}
+
+const visitOf = (data: { visit?: number }) => (data.visit ? { visit: data.visit } : {});
+
+// The coverage segments of a run, by iteration and visit (null: between visits).
+export interface Segment {
+  segment: number;
+  iteration: number;
+  visit: number | null;
+}
+
+export function segmentsOf(events: RawEvent[]): Segment[] {
+  return events.flatMap(({ data }) =>
+    data.type === "segment" ? [{ segment: data.segment, iteration: data.iteration, visit: data.visit ?? null }] : [],
+  );
 }
 
 function observed(stack: StackAddress[], symbols: Symbols) {

@@ -1,14 +1,21 @@
 // The observatory runtime: turns hook calls into events for the host.
 //
 //   iteration_begin {iteration, pass}
-//   value           {iteration, value: Description}
-//   replace         {iteration, old: Description, new: Description}
-//   iteration_end   {iteration, ir: the module after the iteration}, followed by the
-//                   iteration's coverage profile
+//   visit_begin     {iteration, visit, instruction: Description}
+//   value           {iteration, visit?, value: Description}
+//   replace         {iteration, visit?, old: Description, new: Description}
+//   segment         {iteration, visit?, segment}, followed by the segment's coverage profile
+//   visit_end       {iteration, visit}
+//   iteration_end   {iteration, ir: the module after the iteration}
 //
 // Description: {ptr, ir, opcode?, fn?, bb?, debug_loc?} (empty fields are omitted).
 // Events are recorded only inside an iteration: outside one, Value::doRAUW is also used
-// by the IR parser and others, which are not under observation.
+// by the IR parser and others, which are not under observation. `visit` is set inside a
+// visit of an instruction by InstCombine (numbered from 1 over the run).
+//
+// Coverage comes in segments: each visit is one, and so is the code of an iteration
+// before, between and after visits. The counters are reset at the start of each, so an
+// iteration's coverage is the merge of its segments.
 #include "llvm_observatory/hooks.h"
 #include "llvm_observatory/session.h"
 
@@ -18,6 +25,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
@@ -39,6 +47,9 @@ namespace {
 struct State {
   const llvm::Module *Module = nullptr; // the module under observation
   long Iteration = 0;                 // 1-based number of the current or last iteration
+  long Visit = 0;                     // the current visit; 0 = between visits
+  long Visits = 0;                    // visits so far
+  long Segments = 0;                  // coverage segments so far
   int Depth = 0;                      // nesting of IterationScope; 0 = not observing
   std::set<const llvm::Value *> Seen; // values already reported in this iteration
 };
@@ -101,8 +112,11 @@ void describe(Json &J, const char *Key, const llvm::Value &V) {
 }
 
 Json event(const char *Type) {
+  const State &S = state();
   Json J;
-  J.open().field("type", Type).field("iteration", state().Iteration);
+  J.open().field("type", Type).field("iteration", S.Iteration);
+  if (S.Visit)
+    J.field("visit", S.Visit);
   return J;
 }
 
@@ -110,6 +124,15 @@ std::vector<char> profile() {
   std::vector<char> Buffer(__llvm_profile_get_size_for_buffer());
   __llvm_profile_write_buffer(Buffer.data());
   return Buffer;
+}
+
+// Reports the coverage since the last reset as a segment, and starts the next one.
+void end_segment() {
+  State &S = state();
+  ++S.Segments;
+  host::emit(event("segment").field("segment", S.Segments).close().str());
+  host::emit_profile(S.Segments, profile());
+  __llvm_profile_reset_counters();
 }
 
 } // namespace
@@ -151,11 +174,31 @@ IterationScope::~IterationScope() {
   State &S = state();
   if (--S.Depth > 0)
     return;
+  end_segment();
   Json End = event("iteration_end");
   if (S.Module)
     End.field("ir", printed([&](llvm::raw_ostream &OS) { S.Module->print(OS, nullptr); }));
   host::emit(End.close().str());
-  host::emit_profile(S.Iteration, profile());
+}
+
+VisitScope::VisitScope(const llvm::Instruction &I) {
+  State &S = state();
+  if (S.Depth == 0 || S.Visit)
+    return;
+  end_segment(); // the iteration's code before this visit
+  S.Visit = ++S.Visits;
+  Json J = event("visit_begin");
+  describe(J, "instruction", I);
+  host::emit(J.close().str());
+}
+
+VisitScope::~VisitScope() {
+  State &S = state();
+  if (S.Depth == 0 || !S.Visit)
+    return;
+  end_segment();
+  host::emit(event("visit_end").close().str());
+  S.Visit = 0;
 }
 
 } // namespace llvm_obs

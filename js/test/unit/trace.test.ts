@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RawEvent } from "../../src/core/host.ts";
 import type { Symbols } from "../../src/core/symbolize.ts";
-import { buildTrace, shortName, stackAddresses } from "../../src/core/trace.ts";
+import { buildTrace, segmentsOf, shortName, stackAddresses } from "../../src/core/trace.ts";
 
 const frame = (fn: string, path: string | null, line = 1) => ({ function: fn, path, line, column: 0 });
 
@@ -71,5 +71,33 @@ describe("shortName", () => {
     ["main", "main"],
   ])("%s", (full, short) => {
     expect(shortName(full)).toBe(short);
+  });
+});
+
+describe("visits and segments", () => {
+  const instruction = { ptr: "0x20", ir: "%a = add i32 %x, 0" };
+  const raw: RawEvent[] = [
+    { data: { type: "iteration_begin", iteration: 1, pass: "instcombine" }, stack: [] },
+    { data: { type: "segment", iteration: 1, segment: 1 }, stack: [] },
+    { data: { type: "visit_begin", iteration: 1, visit: 1, instruction }, stack: [] },
+    { data: { type: "value", iteration: 1, visit: 1, value }, stack: [] },
+    { data: { type: "segment", iteration: 1, visit: 1, segment: 2 }, stack: [] },
+    { data: { type: "visit_end", iteration: 1, visit: 1 }, stack: [] },
+    { data: { type: "segment", iteration: 1, segment: 3 }, stack: [] },
+    { data: { type: "iteration_end", iteration: 1 }, stack: [] },
+  ];
+
+  it("records each visit and the visit of each record", () => {
+    const [it1] = buildTrace(raw, new Map()).iterations;
+    expect(it1.visits).toEqual([{ number: 1, instruction }]);
+    expect(it1.values[0].visit).toBe(1);
+  });
+
+  it("lists the coverage segments by iteration and visit", () => {
+    expect(segmentsOf(raw)).toEqual([
+      { segment: 1, iteration: 1, visit: null },
+      { segment: 2, iteration: 1, visit: 1 },
+      { segment: 3, iteration: 1, visit: null },
+    ]);
   });
 });

@@ -10,7 +10,7 @@ FILES = {
     "llvm/CMakeLists.txt": "set(LLVM_VERSION_MAJOR 23)\n",
     "llvm/lib/IR/Value.cpp": "void Value::doRAUW(Value *New, int M) {\n}\n",
     "llvm/lib/Transforms/InstCombine/InstructionCombining.cpp": (
-        "bool InstCombinerImpl::run() {\n  return true;\n}\n"
+        "bool InstCombinerImpl::run() {\n  if (Instruction *R = visit(*I))\n    return true;\n  return false;\n}\n"
         "Value *InstCombinerImpl::simplify(Value *V) {\n  return V;\n}\n"
     ),
 }
@@ -31,6 +31,7 @@ def test_patches_every_rule(tree: Path):
         "value-returns": 1,
         "replace": 1,
         "iteration:instcombine": 1,
+        "visit": 1,
         "iteration:aggressive-instcombine": 0,
     }
     combining = (tree / "llvm/lib/Transforms/InstCombine/InstructionCombining.cpp").read_text()

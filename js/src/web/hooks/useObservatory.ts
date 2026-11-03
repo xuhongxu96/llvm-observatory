@@ -1,7 +1,7 @@
 // The observatory worker as React state: load once, run IR, fetch iteration coverage.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FileCoverage, IterationCoverage } from "../../core/mcdc.ts";
-import type { TargetInfo } from "../../core/observatory.ts";
+import type { IterationCoverage } from "../../core/mcdc.ts";
+import type { CoverageScope, TargetInfo } from "../../core/observatory.ts";
 import type { RunResult, WorkerRequest, WorkerResponse } from "../worker/protocol.ts";
 
 export type Status =
@@ -17,10 +17,10 @@ export interface Observatory {
   target: TargetInfo | null;
   result: RunResult | null;
   run(ir: string): void;
-  coverage(iteration: number): Promise<IterationCoverage>; // of the current result
+  coverage(scope: CoverageScope): Promise<IterationCoverage>; // of the current result
 }
 
-type Pending = { resolve: (files: [string, FileCoverage][]) => void; reject: (err: Error) => void };
+type Pending = { resolve: (coverage: IterationCoverage) => void; reject: (err: Error) => void };
 
 export function useObservatory(): Observatory {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
@@ -30,7 +30,7 @@ export function useObservatory(): Observatory {
   const nextId = useRef(0);
   const runId = useRef(-1);
   const pending = useRef(new Map<number, Pending>());
-  const coverageCache = useRef(new Map<number, Promise<IterationCoverage>>());
+  const coverageCache = useRef(new Map<string, Promise<IterationCoverage>>()); // by scope
 
   useEffect(() => {
     const w = new Worker(new URL("../worker/observatory.worker.ts", import.meta.url), { type: "module" });
@@ -49,7 +49,7 @@ export function useObservatory(): Observatory {
           setStatus(data.result.status === 0 ? { kind: "done" } : { kind: "runError", message: firstLine(data.result.stderr) });
           break;
         case "coverage":
-          pending.current.get(data.id)?.resolve(data.files);
+          pending.current.get(data.id)?.resolve(data.coverage);
           pending.current.delete(data.id);
           break;
         case "error":
@@ -74,15 +74,16 @@ export function useObservatory(): Observatory {
     worker.current?.postMessage({ type: "run", id: runId.current, ir } satisfies WorkerRequest);
   }, []);
 
-  const coverage = useCallback((iteration: number) => {
-    let cached = coverageCache.current.get(iteration);
+  const coverage = useCallback((scope: CoverageScope) => {
+    const key = `${scope.iteration ?? ""}:${scope.visit ?? ""}`;
+    let cached = coverageCache.current.get(key);
     if (!cached) {
       const id = nextId.current++;
-      cached = new Promise<[string, FileCoverage][]>((resolve, reject) => {
+      cached = new Promise<IterationCoverage>((resolve, reject) => {
         pending.current.set(id, { resolve, reject });
-        worker.current?.postMessage({ type: "coverage", id, iteration } satisfies WorkerRequest);
-      }).then((files) => new Map(files));
-      coverageCache.current.set(iteration, cached);
+        worker.current?.postMessage({ type: "coverage", id, scope } satisfies WorkerRequest);
+      });
+      coverageCache.current.set(key, cached);
     }
     return cached;
   }, []);

@@ -28,14 +28,17 @@ OBSERVED_PASSES = (
     "lib/Analysis/ConstantFolding.cpp",
 )
 
+# InstCombine's main loop; InstCombinerImpl was InstCombiner before LLVM 12.
+INSTCOMBINE_RUN = ("InstCombinerImpl::run", "InstCombiner::run")
+
 RULES = (
     Rule(hooks.ValueReturns(), OBSERVED_PASSES),
     Rule(hooks.REPLACE, ("lib/IR/Value.cpp",)),
     Rule(
-        # InstCombinerImpl was InstCombiner before LLVM 12.
-        hooks.iteration("instcombine", ("InstCombinerImpl::run", "InstCombiner::run")),
+        hooks.iteration("instcombine", INSTCOMBINE_RUN),
         ("lib/Transforms/InstCombine/InstructionCombining.cpp",),
     ),
+    Rule(hooks.VisitScopeHook(INSTCOMBINE_RUN), ("lib/Transforms/InstCombine/InstructionCombining.cpp",)),
     Rule(
         # The new-pass-manager entry point; absent in old releases.
         hooks.iteration("aggressive-instcombine", ("AggressiveInstCombinePass::run",)),

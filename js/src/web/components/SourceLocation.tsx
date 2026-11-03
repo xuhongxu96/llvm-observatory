@@ -1,11 +1,11 @@
 // A source location of a frame: opens the source view, with a GitHub link beside it.
-import type { TargetInfo } from "../../core/observatory.ts";
+import type { CoverageScope, TargetInfo } from "../../core/observatory.ts";
 import type { Frame } from "../../core/types.ts";
 import { githubUrl } from "../model/github.ts";
 
 export interface SourceSelection {
-  iteration: number;
-  path: string | null; // null: the overview of the iteration's evaluated sources
+  scope: CoverageScope; // whose conditions: an iteration's, or one visit's
+  path: string | null; // null: the overview of the sources that evaluated conditions
   line: number | null;
 }
 
@@ -13,18 +13,18 @@ export type OpenSource = (selection: SourceSelection) => void;
 
 interface Props {
   frame: Frame;
-  iteration: number;
+  scope: CoverageScope;
   target: TargetInfo | null;
   onOpen: OpenSource;
 }
 
-export function SourceLocation({ frame, iteration, target, onOpen }: Props) {
+export function SourceLocation({ frame, scope, target, onOpen }: Props) {
   if (!frame.path) return null;
   const { path, line } = frame;
   const name = `${path.slice(path.lastIndexOf("/") + 1)}:${line}`;
   return (
     <span className="src-loc">
-      <button type="button" className="link" title={`${path}:${line}`} onClick={() => onOpen({ iteration, path, line })}>
+      <button type="button" className="link" title={`${path}:${line}`} onClick={() => onOpen({ scope, path, line })}>
         {name}
       </button>
       {target && (
