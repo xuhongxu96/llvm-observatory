@@ -13,6 +13,13 @@ test("observes InstCombine and shows the conditions of an iteration", async ({ p
   await expect(page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first()).toBeVisible();
   await expect(page.getByText("Optimized IR")).toBeVisible();
 
+  // Scrolled, the filter bar stays flush with the trace pane's top: nothing shows above it.
+  const barOffset = await page.locator(".structured-trace").evaluate((trace) => {
+    trace.scrollTop = 100;
+    return trace.querySelector(".trace-filter-bar")!.getBoundingClientRect().top - trace.getBoundingClientRect().top;
+  });
+  expect(barOffset).toBe(0);
+
   // The rule opens its source, with the iteration's MC/DC badges.
   await page.getByRole("button", { name: "InstCombinerImpl::visitAdd" }).first().click();
   await expect(page.locator(".source-code .row.current")).toContainText("if (Value *V = simplifyAddInst(");

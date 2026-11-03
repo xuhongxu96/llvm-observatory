@@ -210,7 +210,7 @@ html, body, #root { height: 100%; margin: 0; }
 .structured-trace {
   height: 100%;
   overflow: auto;
-  padding: 0.5rem 0.75rem 2rem;
+  padding: 0 0.75rem 2rem; /* no top padding: the sticky filter bar would stick below it */
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
 }
@@ -222,10 +222,11 @@ html, body, #root { height: 100%; margin: 0; }
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
-  padding: 0.4rem 0;
+  /* Across the container's side padding too, so nothing scrolls by beside it. */
+  margin: 0 -0.75rem 0.5rem;
+  padding: 0.5rem 0.75rem 0.4rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  margin-bottom: 0.5rem;
 }
 .trace-filter-bar input[type="search"] {
   flex: 1 1 120px;
