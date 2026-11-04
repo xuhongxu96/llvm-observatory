@@ -171,3 +171,12 @@ An end-to-end input states what it expects in comments:
 - MC/DC needs two or more conditions (`&&`, `||`). A plain `if (c)` or `while (c)` shows
   only whether it was true, false or both, from its branch counters.
 - The source view shows the patched sources, as compiled, so that coverage columns match.
+
+## Acknowledgements
+
+Thanks to Yingwei Zheng ([@dtcxzyw](https://github.com/dtcxzyw)) and Min Hsu
+([@mshockwave](https://github.com/mshockwave)) for their suggestions in the
+[LLVM Discourse thread](https://discourse.llvm.org/t/web-based-trace-viewer-for-instcombine-rewrites/90889):
+observing InstSimplify, ConstantFolding, VectorCombine and AggressiveInstCombine;
+showing the conditions that held, the ValueTracking queries and the worklist; and
+weighing the compile-time cost and the trace size.

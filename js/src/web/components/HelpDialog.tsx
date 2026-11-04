@@ -25,8 +25,8 @@ function setHelpDismissed(dismissed: boolean) {
   }
 }
 
-// Text with `code` in backquotes (LLVM IR if it has a %, else C++) and **bold** in double
-// stars.
+// Text with `code` in backquotes (LLVM IR if it has a %, else C++), **bold** in double
+// stars and [links](https://…).
 function Prose({ text }: { text: string }) {
   return text.split("`").map((piece, i) =>
     i % 2 ? (
@@ -34,7 +34,17 @@ function Prose({ text }: { text: string }) {
         <Code text={piece} language={piece.includes("%") ? "llvm-ir" : "cpp"} />
       </code>
     ) : (
-      <Fragment key={i}>{piece.split("**").map((part, j) => (j % 2 ? <Bold key={j} text={part} /> : part))}</Fragment>
+      <Fragment key={i}>
+        {piece.split(/\[([^\]]+)\]\((https:[^)]+)\)/).map((part, j, parts) =>
+          j % 3 === 1 ? (
+            <a key={j} href={parts[j + 1]} target="_blank" rel="noreferrer">
+              {part}
+            </a>
+          ) : j % 3 === 2 ? null : (
+            <Fragment key={j}>{part.split("**").map((bit, k) => (k % 2 ? <Bold key={k} text={bit} /> : bit))}</Fragment>
+          ),
+        )}
+      </Fragment>
     ),
   );
 }

@@ -1,8 +1,8 @@
 // The guide (components/HelpDialog.tsx): short sections in plain words, each with an
-// example to try. Text marks `code` with backquotes (LLVM IR if it has a %, else C++)
-// and **bold** with double stars. A picture is what the app shows, in a language to color
-// it in; [[T]] in it is a badge. Every example runs without error and makes the records
-// its section talks about (test/e2e/observe.test.ts).
+// example to try. Text marks `code` with backquotes (LLVM IR if it has a %, else C++),
+// **bold** with double stars and [links](https://…). A picture is what the app shows, in
+// a language to color it in; [[T]] in it is a badge. Every example runs without error
+// and makes the records its section talks about (test/e2e/observe.test.ts).
 
 export interface Example {
   label: string;
@@ -123,6 +123,13 @@ export const HELP: HelpSection[] = [
     text: [
       "The **json** tab shows the trace as JSON, and **events** shows what the instrumented LLVM reported, before any processing. Both can be copied or downloaded.",
       "**Share** copies a link to your IR. Whoever opens it sees the same result.",
+    ],
+  },
+  {
+    id: "thanks",
+    title: "Thanks",
+    text: [
+      "Thanks to Yingwei Zheng (dtcxzyw) and Min Hsu (mshockwave) for their suggestions in the [LLVM Discourse thread](https://discourse.llvm.org/t/web-based-trace-viewer-for-instcombine-rewrites/90889).",
     ],
   },
 ];
