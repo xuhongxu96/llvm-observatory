@@ -180,3 +180,11 @@ Thanks to Yingwei Zheng ([@dtcxzyw](https://github.com/dtcxzyw)) and Min Hsu
 observing InstSimplify, ConstantFolding, VectorCombine and AggressiveInstCombine;
 showing the conditions that held, the ValueTracking queries and the worklist; and
 weighing the compile-time cost and the trace size.
+
+Thanks to Kaibo Ma ([@fee1-dead](https://github.com/fee1-dead)), Sami Hassan
+([@Sami-Hassan-1](https://github.com/Sami-Hassan-1)), Fiona Cai
+([@fiona-cai](https://github.com/fiona-cai)) and Peter Rong
+([@dnexdev](https://github.com/dnexdev)) for their contributions during the UR2PHD
+program. Kaibo also drew attention to the method this project uses to symbolize
+WebAssembly stack traces, from Armin Ronacher's
+[How to WASM DWARF](https://lucumr.pocoo.org/2020/11/30/how-to-wasm-dwarf/).

@@ -130,6 +130,7 @@ export const HELP: HelpSection[] = [
     title: "Thanks",
     text: [
       "Thanks to Yingwei Zheng (dtcxzyw) and Min Hsu (mshockwave) for their suggestions in the [LLVM Discourse thread](https://discourse.llvm.org/t/web-based-trace-viewer-for-instcombine-rewrites/90889).",
+      "Thanks to [Kaibo Ma](https://github.com/fee1-dead), [Sami Hassan](https://github.com/Sami-Hassan-1), [Fiona Cai](https://github.com/fiona-cai) and [Peter Rong](https://github.com/dnexdev) for their contributions during the UR2PHD program. Kaibo also drew attention to the method this project uses to symbolize WebAssembly stack traces, from Armin Ronacher's [How to WASM DWARF](https://lucumr.pocoo.org/2020/11/30/how-to-wasm-dwarf/).",
     ],
   },
 ];
