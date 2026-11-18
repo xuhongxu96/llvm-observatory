@@ -1,24 +1,27 @@
 # LLVM Observatory
 
-Watch LLVM's InstCombine at work. Give it LLVM IR; for every iteration of InstCombine
-and AggressiveInstCombine it shows
+This web application allows inspecting LLVM's InstCombine optimization passes. It takes
+LLVM IR and runs passes including InstCombine and AggressiveInstcombine, collects and shows
+these information:
 
-- each value a fold produced, and each replacement (RAUW) it made, with the full call
-  stack down to the source line of the fold, and the rule (the InstCombine function)
-  that fired;
-- each `match(V, P)` call an observed source made, with every matcher of its pattern as
-  it ran: whether it matched, the value it looked at, and what it bound (an IR value,
-  an `APInt`, a predicate, ...);
-- every condition the iteration evaluated in InstCombine, InstructionSimplify,
-  ConstantFolding and ValueTracking, from Clang's MC/DC coverage: `T`/`F` for each
-  operand of `&&`/`||` and the outcome of each decision, so you can see why a fold did
-  or did not apply.
+- The values created and produced while running each pass, and the replacements the pass
+  makes (replaceAllUsesWith/RAUW). A stacktrace is collected for each of these, starting
+    from the line that did the replacement.
+- `match(V, P)` gets used by different optimization passes in order to test whether a value
+  or instruction matches a particular pattern/predicate. The tool collects details around
+  each call, including the value being matched, whether it mathced, and the inner values
+  extracted from the pattern.
+- For conditional statements, MC/DC coverage is used to collect whether each boolean expression
+  (including subexpressions `a` and `b` in `if (a && b)`) evaluated to true or false. This
+  gets attached as an overlay to the source view of the LLVM pass.
 
-Everything runs in WebAssembly, in the browser or in Node. The observed LLVM can be any
-commit; the site, at <https://xuhongxu96.github.io/llvm-observatory/>, follows LLVM main.
-Its **?** opens a short guide with examples to try.
+You can try this tool online at <https://xuhongxu96.github.io/llvm-observatory/> which
+runs the latest commit of LLVM. There is also a short helpful guide with the **?** button.
 
 ## How it works
+
+LLVM is compiled via emscripten to WebAssembly, so this application runs entirely in the browser
+without requiring a backend server.
 
 The patch to LLVM is small. `patcher/` (Python, tree-sitter queries) inserts its hooks,
 each on an existing line, so that line numbers do not change:
@@ -181,10 +184,10 @@ observing InstSimplify, ConstantFolding, VectorCombine and AggressiveInstCombine
 showing the conditions that held, the ValueTracking queries and the worklist; and
 weighing the compile-time cost and the trace size.
 
-Thanks to Kaibo Ma ([@fee1-dead](https://github.com/fee1-dead)), Sami Hassan
+Thanks to beef ([@fee1-dead](https://github.com/fee1-dead)), Sami Hassan
 ([@Sami-Hassan-1](https://github.com/Sami-Hassan-1)), Fiona Cai
 ([@fiona-cai](https://github.com/fiona-cai)) and Peter Rong
 ([@dnexdev](https://github.com/dnexdev)) for their contributions during the UR2PHD
-program. Kaibo also drew attention to the method this project uses to symbolize
+program. beef also drew attention to the method this project uses to symbolize
 WebAssembly stack traces, from Armin Ronacher's
 [How to WASM DWARF](https://lucumr.pocoo.org/2020/11/30/how-to-wasm-dwarf/).

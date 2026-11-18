@@ -55,15 +55,18 @@ export class Recorder {
   }
 }
 
-// V8 prints a wasm frame as `at <module>.<name> (wasm://wasm/<hash>:wasm-function[<index>]:0x<offset>)`,
+// Chrome: `at <module>.<name> (wasm://wasm/<hash>:wasm-function[<index>]:0x<offset>)`
+// Firefox: `<module>.<name> [function]@[host]@[path] line [line] > WebAssembly.compile:wasm-function[2167]:0x1d42f3`
 // or without the name and parentheses. <module> is the name section's module name.
-const WASM_FRAME = /at (?:(.+?) \()?wasm:\/\/[^\s)]*:wasm-function\[\d+\]:0x([0-9a-f]+)\)?$/;
+const WASM_CHROME = /at (?:(.+?) \()?wasm:\/\/[^\s)]*:wasm-function\[\d+\]:0x([0-9a-f]+)\)?$/;
+const WASM_FIREFOX = /(.+?)@.+@.+line \d > WebAssembly.compile:wasm-function\[\d+\]:0x([0-9a-f]+)\)?$/;
 const MODULE_PREFIX = /^[\w.-]+\.wasm\./;
 
 export function parseWasmStack(stack: string): StackAddress[] {
   const frames: StackAddress[] = [];
   for (const line of stack.split("\n")) {
-    const m = line.trim().match(WASM_FRAME);
+    console.debug(line);
+    let m = line.match(WASM_CHROME) || line.match(WASM_FIREFOX);
     if (m) frames.push({ name: m[1]?.replace(MODULE_PREFIX, "") ?? null, offset: parseInt(m[2], 16) });
   }
   return frames;
