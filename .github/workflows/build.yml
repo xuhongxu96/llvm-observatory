@@ -1,0 +1,172 @@
+# The build and the tests, shared by ci.yml (pull requests) and pages.yml (the site):
+# the wasm LLVM tools, the observed driver (LLVM at target_commit.txt, or the input) and
+# the web app, everything in the flake's dev shell, as locally.
+#
+# Everything that can be is cached, from the cheapest to the dearest to redo:
+#   - the Nix store (the flake's toolchain: emscripten, clang, node, uv ...)
+#   - uv's and npm's downloads
+#   - the LLVM git clone (thirdparty/llvm-project)
+#   - the wasm LLVM tools (llvm-cov, llvm-profdata, llvm-symbolizer), until
+#     infra_commit.txt or the toolchain changes
+#   - the built driver (build/dist), until the target commit or anything that goes into
+#     it changes: then patching and building are skipped altogether
+#   - ccache, for when the driver does have to be built
+# A PR reads the caches of its base branch and of itself, never those of other PRs.
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: "LLVM ref to observe (commit, tag or branch; empty: target_commit.txt)"
+        type: string
+        default: ""
+      pages:
+        description: "Upload js/dist as the Pages artifact"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 5G
+      CCACHE_COMPRESS: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Two LLVM trees, their builds and the toolchain do not fit the runner's free disk.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - uses: cachix/install-nix-action@v31
+
+      # The toolchain is the same until the flake changes: restore the store instead of
+      # downloading and unpacking it again.
+      - name: Cache the Nix store
+        uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 6G
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 0
+          purge-primary-key: never
+
+      - name: Toolchain (the flake's dev shell)
+        run: nix develop -c bash -c 'emcc --version | head -n1 && node --version'
+
+      - name: Cache uv and npm downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.npm
+          key: deps-${{ hashFiles('uv.lock', 'js/package-lock.json') }}
+          restore-keys: deps-
+
+      # Fast checks first, so that a plain failure does not wait for the builds.
+      - name: Python tests and type check
+        run: |
+          nix develop -c bash -c '
+            set -e
+            uv sync
+            uv run pytest -q
+            cd js
+            npm ci --no-audit --no-fund
+            npx tsc --noEmit
+            npm test'
+
+      # What the build observes: the ref (target_commit.txt, or the input) resolved to a
+      # commit, since a branch moves.
+      - name: Resolve the target LLVM commit
+        id: target
+        env:
+          TARGET_REF: ${{ inputs.target }}
+        run: |
+          ref=${TARGET_REF:-$(grep -v '^[[:space:]]*\(#\|$\)' target_commit.txt | head -n1 | tr -d '[:space:]')}
+          commit=$(git ls-remote https://github.com/llvm/llvm-project.git "$ref" "$ref^{}" | tail -n1 | cut -f1)
+          # A commit hash is not a ref the remote lists: it stands for itself.
+          echo "commit=${commit:-$ref}" >> "$GITHUB_OUTPUT"
+          echo "$ref -> ${commit:-$ref}"
+
+      # The finished driver and its data: the same inputs give the same files.
+      - name: Restore the built driver
+        id: dist
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/dist/driver
+            build/dist/sources
+            build/dist/tags.json
+            build/dist/xref.json
+            build/dist/target.json
+          key: dist-${{ steps.target.outputs.commit }}-${{ hashFiles('patcher/**', 'driver/**', 'runtime/**', 'scripts/**', 'pyproject.toml', 'uv.lock', 'flake.lock', 'infra_commit.txt') }}
+
+      - name: Restore LLVM tools
+        id: tools
+        uses: actions/cache@v4
+        with:
+          path: build/dist/llvm-tools
+          key: llvm-tools-${{ hashFiles('infra_commit.txt', 'flake.lock', 'scripts/build_tools.sh', 'scripts/lib.sh') }}
+
+      - name: Restore the LLVM clone
+        if: steps.dist.outputs.cache-hit != 'true' || steps.tools.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: thirdparty/llvm-project
+          key: llvm-clone-${{ steps.target.outputs.commit }}-${{ hashFiles('infra_commit.txt') }}
+          restore-keys: llvm-clone-
+
+      - name: Restore ccache
+        if: steps.dist.outputs.cache-hit != 'true' || steps.tools.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-${{ github.ref }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ github.ref }}-
+            ccache-
+
+      - name: Build LLVM tools (llvm-cov, llvm-profdata, llvm-symbolizer)
+        if: steps.tools.outputs.cache-hit != 'true'
+        timeout-minutes: 150
+        run: |
+          nix develop -c bash -c 'scripts/prepare_infra.sh && scripts/build_tools.sh'
+          rm -rf build/infra-host build/infra-wasm
+
+      - name: Patch the target LLVM
+        if: steps.dist.outputs.cache-hit != 'true'
+        env:
+          TARGET_REF: ${{ steps.target.outputs.commit }}
+        run: nix develop -c bash -c 'scripts/prepare_target.sh "$TARGET_REF"'
+
+      - name: Build the driver
+        if: steps.dist.outputs.cache-hit != 'true'
+        timeout-minutes: 240
+        run: nix develop -c scripts/build_driver.sh
+
+      # Saved even when a later step fails or the time runs out, so the next run goes
+      # further. The driver's own cache is saved by its restore step if the job succeeds.
+      - name: Save ccache
+        if: always() && (steps.dist.outputs.cache-hit != 'true' || steps.tools.outputs.cache-hit != 'true')
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-${{ github.ref }}-${{ github.run_id }}
+
+      - name: End-to-end test
+        run: nix develop -c bash -c 'cd js && npm run test:e2e'
+
+      - name: Build the web app
+        run: nix develop -c bash -c 'cd js && npx vite build'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: inputs.pages
+        with:
+          path: js/dist
