@@ -1,0 +1,26 @@
+# Checks for pull requests: the build and the tests of build.yml, without the deploy.
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "LLVM ref to observe (commit, tag or branch; empty: target_commit.txt)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: write # the Nix store cache deletes the entries it replaces
+
+# A newer push to the same PR replaces the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      target: ${{ inputs.target }}
